@@ -52,10 +52,16 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;600&display=swap');
 
-html, body, [class*="css"] { 
-  font-family: 'Source Sans 3', sans-serif; 
+/* ❌ HAPUS ini:
+html, body, [class*="css"]
+*/
+
+/* ✅ Pakai ini saja */
+body {
+  font-family: 'Source Sans 3', sans-serif;
 }
 
+/* 🎯 Typography aman */
 .hero-title {
   font-family: 'Playfair Display', serif;
   font-size: clamp(1.4rem, 2.5vw, 2rem);
@@ -68,7 +74,6 @@ html, body, [class*="css"] {
 .hero-sub { 
   font-size: 0.9rem; 
   color: rgba(128,128,128,0.8); 
-  margin-bottom: 0.5rem; 
 }
 
 .section-title {
@@ -78,45 +83,36 @@ html, body, [class*="css"] {
   color: var(--text-color);
   border-bottom: 1px solid rgba(128,128,128,0.2);
   padding-bottom: 0.3rem;
-  margin: 1.1rem 0 0.7rem 0;
 }
 
-.cover-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-color);
-}
-
-.cover-meta {
-  font-size: 0.7rem;
-  color: rgba(128,128,128,0.8);
-}
-
+/* 🎯 Card */
 .stat-chip {
   background: rgba(240,240,240,0.1);
   border: 1px solid rgba(128,128,128,0.2);
   border-radius: 8px;
   padding: 0.5rem 1rem;
-  text-align: center;
 }
 
-.stat-chip .num {
-  font-family: 'Playfair Display', serif;
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--text-color);
-}
-
-div[data-testid="stSidebar"] {
-  background: var(--background-color);
-}
-
+/* 🎯 Fix container biar nggak kepotong */
 .block-container {
   padding-top: 1.5rem;
   padding-bottom: 2rem;
+  max-width: 1200px;
 }
+
+/* 🎯 Fix overflow bug */
+.main {
+  overflow-x: hidden;
+}
+
+/* 🎯 Sidebar aman */
+section[data-testid="stSidebar"] {
+  background: var(--background-color);
+}
+
 </style>
 """, unsafe_allow_html=True)
+
 # ── Colour palettes ───────────────────────────────────────────────────────────
 WARNA_HEX = {
     "merah":  "#ef4444", "biru":   "#3b82f6", "hijau":  "#22c55e",
