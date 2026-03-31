@@ -129,8 +129,20 @@ PLOTLY_BASE = dict(
 # ── Load & normalise ──────────────────────────────────────────────────────────
 @st.cache_data(show_spinner="Memuat data…")
 def load_data(path):
-    df = pd.read_csv(path, sep=";", encoding="utf-8-sig", dtype=str, low_memory=False)
-    df.columns = df.columns.str.strip().str.upper().str.replace(" ", "_")
+    # Coba beberapa encoding yang umum digunakan untuk file CSV dari Excel/Windows
+    encodings = ["utf-8-sig", "latin1", "cp1252"]
+    df = None
+    
+    for enc in encodings:
+        try:
+            df = pd.read_csv(path, sep=";", encoding=enc, dtype=str, low_memory=False)
+            break # Berhenti jika berhasil membaca
+        except UnicodeDecodeError:
+            continue
+    
+    if df is None:
+        # Jika semua gagal, baca dengan mengabaikan karakter yang bermasalah
+        df = pd.read_csv(path, sep=";", encoding="utf-8", errors="replace", dtype=str, low_memory=False)
 
     def _rating(v):
         if pd.isna(v) or str(v).strip() in ("", "nan", "N/A"):
