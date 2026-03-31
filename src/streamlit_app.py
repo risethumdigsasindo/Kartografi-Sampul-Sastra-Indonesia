@@ -50,74 +50,73 @@ COVERS_DIR = os.path.join(os.path.dirname(BASE_DIR), "covers")
 # ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;600&display=swap');
 
-  html, body, [class*="css"] { 
-    font-family: 'Source Sans 3', sans-serif; 
-  }
+html, body, [class*="css"] { 
+  font-family: 'Source Sans 3', sans-serif; 
+}
 
-  :root {
-    --text-color: var(--text-color);
-    --bg-color: var(--background-color);
-    --secondary-text: rgba(128,128,128,0.8);
-  }
+.hero-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+  font-weight: 700;
+  color: var(--text-color);
+  line-height: 1.2;
+  margin-bottom: 0.2rem;
+}
 
-  .hero-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-color);
-    line-height: 1.2;
-    margin-bottom: 0.2rem;
-  }
+.hero-sub { 
+  font-size: 0.9rem; 
+  color: rgba(128,128,128,0.8); 
+  margin-bottom: 0.5rem; 
+}
 
-  .hero-sub { 
-    font-size: 0.9rem; 
-    color: var(--secondary-text); 
-    margin-bottom: 0.5rem; 
-  }
+.section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  font-weight: 600;
+  color: var(--text-color);
+  border-bottom: 1px solid rgba(128,128,128,0.2);
+  padding-bottom: 0.3rem;
+  margin: 1.1rem 0 0.7rem 0;
+}
 
-  .section-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: var(--text-color);
-    border-bottom: 1px solid rgba(128,128,128,0.2);
-    padding-bottom: 0.3rem;
-    margin: 1.1rem 0 0.7rem 0;
-  }
+.cover-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
 
-  .cover-title {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-color);
-  }
+.cover-meta {
+  font-size: 0.7rem;
+  color: rgba(128,128,128,0.8);
+}
 
-  .cover-meta {
-    font-size: 0.7rem;
-    color: var(--secondary-text);
-  }
+.stat-chip {
+  background: rgba(240,240,240,0.1);
+  border: 1px solid rgba(128,128,128,0.2);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  text-align: center;
+}
 
-  .stat-chip {
-    background: rgba(240,240,240,0.1);
-    border: 1px solid rgba(128,128,128,0.2);
-    border-radius: 8px;
-    padding: 0.5rem 1rem;
-    text-align: center;
-  }
+.stat-chip .num {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-color);
+}
 
-  .stat-chip .num {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--text-color);
-  }
+div[data-testid="stSidebar"] {
+  background: var(--background-color);
+}
 
-  div[data-testid="stSidebar"] {
-    background: var(--bg-color);
-  }
+.block-container {
+  padding-top: 1.5rem;
+  padding-bottom: 2rem;
+}
 </style>
-
+""", unsafe_allow_html=True)
 # ── Colour palettes ───────────────────────────────────────────────────────────
 WARNA_HEX = {
     "merah":  "#ef4444", "biru":   "#3b82f6", "hijau":  "#22c55e",
