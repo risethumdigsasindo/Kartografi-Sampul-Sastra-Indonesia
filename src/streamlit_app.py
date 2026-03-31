@@ -1,892 +1,970 @@
 """
-Analisis Visual Sampul Sastra Indonesia
-Fokus: Analisis Warna (Modul A)
+streamlit_app.py — Kartografi Sampul Sastra Indonesia 2000–2025
+Deploy: HuggingFace Spaces → src/streamlit_app.py
+
+Struktur repo:
+  src/
+    streamlit_app.py      ← file ini
+    data.csv              ← gabungan semua modul (atau parsial)
+  covers/                 ← folder gambar (Git LFS)
+  requirements.txt
+
+requirements.txt:
+  streamlit>=1.32.0
+  pandas>=2.0.0
+  numpy>=1.24.0
+  plotly>=5.18.0
+  matplotlib>=3.7.0
+  pillow>=10.0.0
 """
-import streamlit as st
-import pandas as pd
+
+import os
+import re
+import warnings
+warnings.filterwarnings("ignore")
+
 import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import plotly.express as px
+import plotly.graph_objects as go
 from PIL import Image
-import os, re
-from collections import Counter
-from sklearn.cluster import KMeans
-import cv2
+import streamlit as st
 
-def extract_palette_with_percent(image_path, k=5):
-    try:
-        img = cv2.imread(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (100, 100))
-
-        pixels = img.reshape(-1, 3)
-
-        kmeans = KMeans(n_clusters=k, n_init=10)
-        labels = kmeans.fit_predict(pixels)
-
-        colors = kmeans.cluster_centers_.astype(int)
-
-        # hitung persentase
-        counts = np.bincount(labels)
-        percents = counts / counts.sum()
-
-        palette = []
-        for color, p in zip(colors, percents):
-            hex_color = "#{:02x}{:02x}{:02x}".format(*color)
-            palette.append((hex_color, float(p)))
-
-        # sort dari paling dominan
-        palette = sorted(palette, key=lambda x: x[1], reverse=True)
-
-        return palette
-
-    except:
-        return None
-# ─────────────────────────────────────────────────────────────────────────────
-# CONFIG
-# ─────────────────────────────────────────────────────────────────────────────
-COVER_DIR   = "covers"          # folder gambar sampul
-DATA_PATH   = "src/data.csv"        # CSV hasil analisis
-PAGE_TITLE  = "Analisis Visual Sampul Sastra Indonesia"
-MAX_COVERS  = 48                # grid maks per halaman
-
-WARNA_HEX = {
-    "Merah"              : "#e63946",
-    "Oranye"             : "#f4a261",
-    "Cokelat"            : "#8d5524",   # baru (dipisah dari oranye)
-    "Kuning"             : "#f4d35e",   # termasuk emas
-    "Hijau"              : "#2a9d8f",   # termasuk lime
-    "Toska"              : "#00b4d8",
-    "Biru"               : "#4895ef",
-    "Ungu"               : "#7209b7",   # termasuk magenta
-    "Merah Muda (Pink)"  : "#ff8fab",
-    "Hitam"              : "#1a1a1a",
-    "Abu-abu"            : "#adb5bd",
-    "Putih"              : "#f8f9fa",
-    "Lainnya"            : "#dddddd",
-}
-WARNA_ORDER = list(WARNA_HEX.keys())
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE SETUP
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title=PAGE_TITLE,
+    page_title="Kartografi Sampul Sastra Indonesia",
     page_icon="📚",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
+# ── Path ──────────────────────────────────────────────────────────────────────
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH  = os.path.join(BASE_DIR, "data.csv")
+COVERS_DIR = os.path.join(os.path.dirname(BASE_DIR), "covers")
+
+# ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  .cover-card {border-radius:8px; overflow:hidden; box-shadow:0 2px 8px #0002;}
-  .palette-strip {height:24px; border-radius:4px; margin:4px 0;}
-  .metric-box {background:#f8f9fa; border-radius:8px; padding:12px; text-align:center;}
-  h1 {font-family: Georgia, serif;}
-  .stSelectbox label, .stSlider label {font-size:13px;}
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;600&display=swap');
+  html, body, [class*="css"] { font-family: 'Source Sans 3', sans-serif; }
+  .hero-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem; font-weight: 700; color: #1a1a2e; line-height: 1.2;
+    margin-bottom: 0.2rem;
+  }
+  .hero-sub { font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem; }
+  .section-label {
+    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #9ca3af; margin-bottom: 0.3rem;
+  }
+  .section-title {
+    font-family: 'Playfair Display', serif; font-size: 1.05rem;
+    font-weight: 600; color: #1a1a2e;
+    border-bottom: 2px solid #e5e7eb; padding-bottom: 0.3rem;
+    margin: 1.1rem 0 0.7rem 0;
+  }
+  .badge {
+    display: inline-block; padding: 2px 7px; border-radius: 10px;
+    font-size: 0.7rem; font-weight: 600; margin: 1px 2px;
+  }
+  .tag-warna    { background: #dbeafe; color: #1d4ed8; }
+  .tag-typeface { background: #fce7f3; color: #9d174d; }
+  .tag-gaya     { background: #d1fae5; color: #065f46; }
+  .cover-title  {
+    font-size: 0.78rem; font-weight: 600; color: #111827;
+    line-height: 1.3; margin: 0.3rem 0 0.1rem;
+  }
+  .cover-meta   { font-size: 0.69rem; color: #6b7280; margin: 0; }
+  .note-box {
+    background: #fffbeb; border-left: 3px solid #f59e0b;
+    padding: 0.6rem 0.9rem; border-radius: 0 6px 6px 0;
+    font-size: 0.82rem; color: #78350f; margin: 0.5rem 0;
+  }
+  .stat-row { display: flex; gap: 0.8rem; flex-wrap: wrap; margin: 0.8rem 0; }
+  .stat-chip {
+    background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: 0.5rem 1rem; text-align: center; min-width: 90px;
+  }
+  .stat-chip .num {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.45rem; font-weight: 700; color: #111827;
+  }
+  .stat-chip .lbl { font-size: 0.7rem; color: #6b7280; }
+  div[data-testid="stSidebar"] { background: #f9fafb; }
 </style>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# DATA LOADING
-# ─────────────────────────────────────────────────────────────────────────────
-@st.cache_data
-def load_data():
-    if not os.path.exists(DATA_PATH):
-        return None
-    df = pd.read_csv(DATA_PATH, encoding="utf-8")
-    # numeric cleanup
-    df["RATING_AVG"]   = pd.to_numeric(df["RATING_AVG"],   errors="coerce")
-    df["TAHUN_TERBIT"] = pd.to_numeric(df["TAHUN_TERBIT"], errors="coerce")
-    df["warna_h"]      = pd.to_numeric(df["warna_h"],      errors="coerce")
-    df["warna_s"]      = pd.to_numeric(df["warna_s"],      errors="coerce")
-    df["warna_v"]      = pd.to_numeric(df["warna_v"],      errors="coerce")
-    df["warna_r"]      = pd.to_numeric(df["warna_r"],      errors="coerce")
-    df["warna_g"]      = pd.to_numeric(df["warna_g"],      errors="coerce")
-    df["warna_b"]      = pd.to_numeric(df["warna_b"],      errors="coerce")
-    df["TOTAL_RATINGS"] = pd.to_numeric(df["TOTAL_RATINGS"], errors="coerce")
-    # fill missing warna_kategori
-    df["warna_kategori"] = df["warna_kategori"].fillna("Lainnya")
+
+# ── Colour palettes ───────────────────────────────────────────────────────────
+WARNA_HEX = {
+    "merah":  "#ef4444", "biru":   "#3b82f6", "hijau":  "#22c55e",
+    "kuning": "#eab308", "oranye": "#f97316", "ungu":   "#a855f7",
+    "hitam":  "#374151", "putih":  "#d1d5db", "abu":    "#9ca3af",
+}
+GAYA_COLOR = {
+    "photograph":    "#3b82f6", "hand_drawn":    "#ef4444",
+    "abstract":      "#a855f7", "flat_graphic":  "#22c55e",
+    "collage":       "#f97316", "text_dominant": "#14b8a6",
+    "unknown":       "#d1d5db",
+}
+TYPEFACE_COLOR = {
+    "serif":      "#1e40af", "sans-serif": "#0891b2",
+    "slab-serif": "#b45309", "script":     "#be185d",
+    "display":    "#7c3aed", "monospace":  "#15803d",
+    "unknown":    "#9ca3af",
+}
+PLOTLY_BASE = dict(
+    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+    font_family="Source Sans 3, sans-serif",
+    margin=dict(t=28, b=28, l=16, r=16),
+    showlegend=False,
+)
+
+
+# ── Load & normalise ──────────────────────────────────────────────────────────
+@st.cache_data(show_spinner="Memuat data…")
+def load_data(path):
+    df = pd.read_csv(path, sep=";", encoding="utf-8-sig", dtype=str, low_memory=False)
+    df.columns = df.columns.str.strip().str.upper().str.replace(" ", "_")
+
+    def _rating(v):
+        if pd.isna(v) or str(v).strip() in ("", "nan", "N/A"):
+            return np.nan
+        v2 = re.sub(r"[^0-9.,]", "", str(v)).replace(",", ".")
+        if not v2:
+            return np.nan
+        try:
+            f = float(v2)
+            return round(f / 100, 2) if f > 10 else round(f, 2)
+        except Exception:
+            return np.nan
+
+    def _count(v):
+        if pd.isna(v) or str(v).strip() in ("", "nan", "N/A"):
+            return 0
+        nums = re.sub(r"[^0-9.,]", "", str(v))
+        if not nums:
+            return 0
+        if re.search(r"[,.]\d{3}($|[,.])", nums):
+            nums = nums.replace(",", "").replace(".", "")
+        elif "," in nums and "." not in nums:
+            parts = nums.split(",")
+            nums = nums.replace(",", "") if (len(parts) == 2 and len(parts[1]) == 3) \
+                   else nums.replace(",", ".")
+        elif "." in nums and "," not in nums:
+            parts = nums.split(".")
+            if len(parts) == 2 and len(parts[1]) == 3:
+                nums = nums.replace(".", "")
+        try:
+            return int(float(nums))
+        except Exception:
+            return 0
+
+    for col in ["RATING_AVG", "RATING", "AVERAGE_RATING"]:
+        if col in df.columns:
+            df[col] = df[col].apply(_rating)
+
+    for col in ["TOTAL_RATING", "RATINGS_COUNT", "JUMLAH_RATING",
+                "TOTAL_REVIEW", "REVIEWS_COUNT", "JUMLAH_REVIEW"]:
+        if col in df.columns:
+            df[col] = df[col].apply(_count)
+
+    for col in ["TAHUN_TERBIT", "TAHUN", "YEAR"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+
+    num_cols = [
+        "BRIGHTNESS_MEAN", "SATURATION_MEAN", "TEKS_COVERAGE",
+        "TYPEFACE_SKOR", "TYPEFACE_CONFIDENCE",
+        "GAYA_SKOR", "YOLO_N_OBJEK", "DETR_OBJEK_N",
+        "JUDUL_MATCH_SCORE", "HUE_DOMINANT",
+    ] + [f"WARNA_PCT_{i}" for i in range(1, 6)] + \
+      [f"WARNA_H_{i}" for i in range(1, 6)]
+
+    for col in num_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+            if "PCT" in col:
+                df[col] = df[col].fillna(0)
+
+    for col in df.select_dtypes(include="object").columns:
+        df[col] = df[col].fillna("").astype(str).str.strip()
+
     return df
 
-# --- POPULARITY SCORE ---
 
-    C = df["RATING_AVG"].mean()
-    m = df["TOTAL_RATINGS"].quantile(0.75)  # threshold (bisa diubah)
+# ── Kolom kunci ───────────────────────────────────────────────────────────────
+def detect_cols(df):
+    return {
+        "img":       next((c for c in ["NAMA_FILE_GAMBAR","IMAGE_FILE","GAMBAR","COVER"] if c in df.columns), None),
+        "title":     next((c for c in ["JUDUL","TITLE","NAMA_BUKU"] if c in df.columns), None),
+        "author":    next((c for c in ["PENULIS","AUTHOR","PENGARANG"] if c in df.columns), None),
+        "year":      next((c for c in ["TAHUN_TERBIT","TAHUN","YEAR"] if c in df.columns), None),
+        "genre":     next((c for c in ["GENRES","GENRE","KATEGORI"] if c in df.columns), None),
+        "rating":    next((c for c in ["RATING_AVG","RATING","AVERAGE_RATING"] if c in df.columns), None),
+        "n_rating":  next((c for c in ["TOTAL_RATING","RATINGS_COUNT","JUMLAH_RATING"] if c in df.columns), None),
+        "publisher": next((c for c in ["PENERBIT","PUBLISHER"] if c in df.columns), None),
+        "tf":        next((c for c in ["TYPEFACE_KATEGORI","FONT_KATEGORI"] if c in df.columns), None),
+        "tf_skor":   next((c for c in ["TYPEFACE_SKOR","TYPEFACE_CONFIDENCE","FONT_CONFIDENCE"] if c in df.columns), None),
+    }
 
-def compute_popularity(row):
-    v = row["TOTAL_RATINGS"]
-    R = row["RATING_AVG"]
 
-    if pd.isna(v) or pd.isna(R):
-        return np.nan
+# ── Modul availability ────────────────────────────────────────────────────────
+def mod_ok(df, module):
+    checks = {
+        "A": ["WARNA_KATEGORI", "WARNA_1"],
+        "B": ["TYPEFACE_KATEGORI", "FONT_KATEGORI"],
+        "C": ["GAYA_ILUSTRASI"],
+    }
+    return any(c in df.columns for c in checks.get(module, []))
 
-    return (v/(v+m))*R + (m/(v+m))*C
 
-    df["POPULARITY_SCORE"] = df.apply(compute_popularity, axis=1)
+# ── Genre helpers ─────────────────────────────────────────────────────────────
+def expand_genres(val):
+    if not val or val in ("", "nan"):
+        return []
+    val = re.sub(r"\.\.\.more$", "", val).strip()
+    return [g.strip() for g in re.split(r"[,;|/]", val) if g.strip()]
 
-def get_cover_path(filename):
-    return os.path.join(COVER_DIR, str(filename))
-
-@st.cache_data
-def get_all_genres(df):
+def get_all_genres(df, genre_col):
+    if not genre_col:
+        return []
     genres = set()
-    df["GENRES"].dropna().str.split(",").apply(
-        lambda x: [genres.add(g.strip()) for g in x]
-    )
+    for val in df[genre_col].dropna():
+        for g in expand_genres(str(val)):
+            if g and g != "nan":
+                genres.add(g)
     return sorted(genres)
 
-@st.cache_data
-def get_all_authors(df):
-    return sorted(df["PENULIS"].dropna().unique().tolist())
-
-def hex_to_rgb_tuple(hex_str):
-    h = str(hex_str).lstrip("#")
-    if len(h) != 6:
-        return (170, 170, 170)
-    try:
-        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-    except:
-        return (170, 170, 170)
-import colorsys
-
-def hex_to_hsv(hex_color):
-    hex_color = hex_color.lstrip("#")
-    r, g, b = tuple(int(hex_color[i:i+2], 16)/255 for i in (0, 2, 4))
-    return colorsys.rgb_to_hsv(r, g, b)
-
-def map_to_color_category(hex_color):
-    h, s, v = hex_to_hsv(hex_color)
-    h = h * 360
-
-    # warna gelap & netral dulu
-    if v < 0.15:
-        return "Hitam"
-    elif s < 0.15 and v > 0.85:
-        return "Putih"
-    elif s < 0.2:
-        return "Abu-abu"
+def filter_genre(df, genre_col, genre):
+    if genre == "Semua" or not genre_col:
+        return df
+    return df[df[genre_col].apply(lambda v: genre in expand_genres(str(v)))]
 
 
+# ── Misc helpers ──────────────────────────────────────────────────────────────
+def star_rating(val):
+    if pd.isna(val) or float(val) == 0:
+        return ""
+    v = float(val)
+    full  = int(v)
+    half  = 1 if (v - full) >= 0.5 else 0
+    empty = 5 - full - half
+    return "★" * full + "½" * half + "☆" * empty
 
-    # warna kromatik (berdasarkan hue)
-    elif 0 <= h < 20 or 340 <= h <= 360:
-        return "Merah"
-    elif 20 <= h < 35:
-        return "Oranye"
-    elif 35 <= h < 50:
-        return "Cokelat"
-    elif 50 <= h < 70:
-        return "Kuning"
-    elif 70 <= h < 160:
-        return "Hijau"
-    elif 160 <= h < 200:
-        return "Toska"
-    elif 160 <= h < 260:
-        return "Biru"
-    elif 260 <= h < 300:
-        return "Ungu"
-    elif 300 <= h < 345:
-        return "Merah Muda (Pink)"
+def cover_path(fname):
+    return os.path.join(COVERS_DIR, str(fname))
 
-    return "Lainnya"
-# ─────────────────────────────────────────────────────────────────────────────
-# VISUALISASI HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
-def make_palette_strip_fig(hex_list, width=4, height=0.4):
-    """Render horizontal palette strip dari list hex colors."""
-    fig, ax = plt.subplots(figsize=(width, height))
-    n = len(hex_list)
-    for i, hx in enumerate(hex_list):
-        ax.add_patch(plt.Rectangle(
-            (i/n, 0), 1/n, 1,
-            facecolor=hx, edgecolor="none"
-        ))
-    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
-    fig.patch.set_alpha(0)
-    plt.tight_layout(pad=0)
-    return fig
+def palet_strip(row, k=5):
+    parts = []
+    for i in range(1, k + 1):
+        hx  = row.get(f"WARNA_HEX_{i}", "") or "#d1d5db"
+        pct = float(row.get(f"WARNA_PCT_{i}", 0) or 0)
+        nm  = row.get(f"WARNA_{i}", "") or ""
+        if pct > 0:
+            parts.append(
+                f'<div style="flex:{pct:.1f};background:{hx};height:5px;'
+                f'margin:0 1px;border-radius:2px;" title="{nm} {pct:.0f}%"></div>'
+            )
+    return '<div style="display:flex;gap:0;margin-top:3px;">' + "".join(parts) + "</div>"
 
-def make_donut_chart(counts_dict, title=""):
-    """Donut chart distribusi warna."""
-    cats   = [k for k in WARNA_ORDER if k in counts_dict and counts_dict[k] > 0]
-    vals   = [counts_dict[k] for k in cats]
-    colors = [WARNA_HEX[k] for k in cats]
-    fig, ax = plt.subplots(figsize=(4, 4))
-    wedges, texts, autotexts = ax.pie(
-        vals, labels=None, colors=colors,
-        autopct="%1.0f%%", startangle=90,
-        pctdistance=0.75,
-        wedgeprops=dict(width=0.5, edgecolor="white", linewidth=1.5),
-    )
-    for at in autotexts:
-        at.set_fontsize(8); at.set_color("white"); at.set_fontweight("bold")
-    if title:
-        ax.set_title(title, fontsize=10, fontweight="bold", pad=6)
-    handles = [mpatches.Patch(color=WARNA_HEX[k], label=f"{k} ({counts_dict.get(k,0)})")
-               for k in cats]
-    ax.legend(handles=handles, loc="lower center",
-              bbox_to_anchor=(0.5, -0.30), ncol=2, fontsize=7,
-              frameon=False)
-    fig.tight_layout()
-    return fig
-
-def make_bar_chart(df_group, x_col, y_col="warna_kategori",
-                   title="", xlabel="", normalize=True):
-    """Stacked bar chart warna per x_col."""
-    pivot = pd.crosstab(df_group[x_col], df_group[y_col])
-    if normalize:
-        pivot = pivot.div(pivot.sum(axis=1), axis=0) * 100
-
-    # Only keep categories that exist
-    cats_present = [c for c in WARNA_ORDER if c in pivot.columns]
-    pivot = pivot[cats_present]
-
-    fig, ax = plt.subplots(figsize=(12, 4))
-    bottom = np.zeros(len(pivot))
-    for cat in cats_present:
-        vals = pivot[cat].values
-        ax.bar(pivot.index.astype(str), vals, bottom=bottom,
-               color=WARNA_HEX[cat], label=cat, width=0.8)
-        bottom += vals
-
-    ax.set_xlabel(xlabel or x_col, fontsize=9)
-    ax.set_ylabel("%" if normalize else "n", fontsize=9)
-    ax.set_title(title, fontsize=11, fontweight="bold")
-    ax.tick_params(axis="x", rotation=45, labelsize=7)
-    ax.tick_params(axis="y", labelsize=8)
-    ax.spines[["top","right"]].set_visible(False)
-    handles = [mpatches.Patch(color=WARNA_HEX[c], label=c) for c in cats_present]
-    ax.legend(handles=handles, bbox_to_anchor=(1.01,1), loc="upper left",
-              fontsize=7, frameon=False)
-    fig.tight_layout()
-    return fig
-
-def make_scatter_hsv(df_sub, color_by="warna_kategori"):
-    """Scatter brightness × saturation, colored by warna_kategori."""
-    df_ok = df_sub.dropna(subset=["warna_v","warna_s","warna_kategori"])
-    fig, ax = plt.subplots(figsize=(5, 4))
-    for cat, grp in df_ok.groupby("warna_kategori"):
-        ax.scatter(grp["warna_v"], grp["warna_s"],
-                   c=WARNA_HEX.get(cat,"#888"),
-                   s=12, alpha=0.6, linewidths=0, label=cat)
-    ax.set_xlabel("Brightness (V)", fontsize=9)
-    ax.set_ylabel("Saturation (S)", fontsize=9)
-    ax.set_title("Brightness × Saturation\n(setiap titik = 1 buku)", fontsize=9, fontweight="bold")
-    ax.tick_params(labelsize=7)
-    ax.spines[["top","right"]].set_visible(False)
-    ax.legend(fontsize=6, frameon=False, bbox_to_anchor=(1.01,1), loc="upper left")
-    fig.tight_layout()
-    return fig
-
-def make_rating_bar(df_sub):
-    """Rata-rata rating per warna_kategori."""
-    rby = (df_sub.dropna(subset=["RATING_AVG","warna_kategori"])
-           .groupby("warna_kategori")["RATING_AVG"]
-           .agg(mean="mean", se=lambda x: x.std()/np.sqrt(len(x)), n="count")
-           .reset_index()
-           .sort_values("mean", ascending=False))
-    rby = rby[rby["warna_kategori"].isin(WARNA_ORDER)]
-
-    fig, ax = plt.subplots(figsize=(6, 3.5))
-    bars = ax.bar(
-        rby["warna_kategori"], rby["mean"],
-        color=[WARNA_HEX.get(k,"#aaa") for k in rby["warna_kategori"]],
-        edgecolor="white", linewidth=0.8,
-        yerr=rby["se"], capsize=3,
-        error_kw=dict(elinewidth=1, capthick=1, ecolor="#555")
-    )
-    global_m = df_sub["RATING_AVG"].mean()
-    ax.axhline(global_m, ls="--", lw=1.2, color="#333",
-               label=f"rata-rata keseluruhan ({global_m:.2f})")
-    ax.set_ylim(rby["mean"].min() - 0.15, rby["mean"].max() + 0.15)
-    ax.set_ylabel("Rata-rata Rating", fontsize=9)
-    ax.set_title("Rating Pembaca per Warna Dominan Sampul\n(error bar = SE)",
-                 fontsize=9, fontweight="bold")
-    ax.tick_params(axis="x", rotation=35, labelsize=7)
-    ax.tick_params(axis="y", labelsize=8)
-    ax.spines[["top","right"]].set_visible(False)
-    ax.legend(fontsize=7, frameon=False)
-    for b, row in zip(bars, rby.itertuples()):
-        ax.text(b.get_x()+b.get_width()/2, b.get_height()+0.01,
-                f"n={row.n}", ha="center", fontsize=6, color="#555")
-    fig.tight_layout()
-    return fig
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN APP
-# ─────────────────────────────────────────────────────────────────────────────
-df = load_data()
-
-@st.cache_data(show_spinner=True)
-def load_palettes(df):
-    palette_dict = {}
-    
-    for idx, row in df.iterrows():
-        path = get_cover_path(row["NAMA_FILE_GAMBAR"])
-        
-        if os.path.exists(path):
-            palette = extract_palette_with_percent(path)
-            palette_dict[idx] = palette
-        else:
-            palette_dict[idx] = None
-    
-    return palette_dict
-
-palette_dict = load_palettes(df)
-new_categories = []
-
-for idx in df.index:
-    palette = palette_dict.get(idx)
-    if palette:
-        dominant_hex = palette[0][0]
-        cat = map_to_color_category(dominant_hex)
+def simple_bar(series, color_map=None, orient="v", h=290):
+    vc = series.value_counts().reset_index()
+    vc.columns = ["lbl", "n"]
+    vc["pct"] = (vc["n"] / vc["n"].sum() * 100).round(1)
+    cm = color_map or {}
+    if orient == "h":
+        fig = px.bar(vc, y="lbl", x="n", orientation="h",
+                     text="pct", color="lbl", color_discrete_map=cm,
+                     labels={"n": "Jumlah", "lbl": ""})
+        fig.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
     else:
-        cat = "Lainnya"
-    new_categories.append(cat)
+        fig = px.bar(vc, x="lbl", y="n",
+                     text="pct", color="lbl", color_discrete_map=cm,
+                     labels={"n": "Jumlah", "lbl": ""})
+        fig.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+    fig.update_layout(**PLOTLY_BASE, height=h)
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(gridcolor="#f3f4f6")
+    return fig
 
-df["warna_kategori"] = new_categories
-if df is None:
-    st.error("⚠️ File `src/data.csv` tidak ditemukan di root repositori.")
+def heatmap_genre_x_col(df, genre_col, col, scale="Blues", max_genre=14, min_n=5):
+    genres = get_all_genres(df, genre_col)[:max_genre]
+    heat = {}
+    for g in genres:
+        sub = filter_genre(df, genre_col, g)
+        sub_valid = sub[sub[col].str.lower().isin(
+            list(WARNA_HEX) + list(GAYA_COLOR) + list(TYPEFACE_COLOR)
+        )] if col in sub.columns else sub
+        if len(sub_valid) >= min_n:
+            heat[g] = sub_valid[col].value_counts(normalize=True) * 100
+    if not heat:
+        return None
+    hdf = pd.DataFrame(heat).fillna(0).T
+    fig = px.imshow(hdf, color_continuous_scale=scale,
+                    text_auto=".1f", labels={"color": "%"})
+    fig.update_layout(**PLOTLY_BASE, height=max(300, len(heat) * 28 + 100),
+                      coloraxis_showscale=False)
+    return fig
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────────────────────────────────────
+if not os.path.exists(DATA_PATH):
+    st.error(f"File data tidak ditemukan: `{DATA_PATH}`")
+    st.info("Letakkan `data.csv` di folder `src/` dan pastikan sudah berisi hasil analisis.")
     st.stop()
 
-all_genres  = get_all_genres(df)
-all_authors = get_all_authors(df)
+df_raw = load_data(DATA_PATH)
+C = detect_cols(df_raw)
+MA = mod_ok(df_raw, "A")
+MB = mod_ok(df_raw, "B")
+MC = mod_ok(df_raw, "C")
 
-# ── SIDEBAR ──────────────────────────────────────────────────────────────────
+
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## Di bawah ini merupakan filter untuk membantu menginterpretasi data:")
-    # TAMBAHKAN DI SINI
-    st.markdown("---")
-    sort_option = st.selectbox(
-    "🔃 Urutkan berdasarkan:",
-    ["Judul (A–Z)", "Rating Tertinggi", "Tahun Terbaru", "Paling Populer"]
-    )
-    # Search
-    q_judul   = st.text_input("🔍 Cari Judul Buku", placeholder="cth: Bumi Manusia")
-    q_penulis = st.selectbox("✍️ Penulis",
-                              ["(semua penulis)"] + all_authors,
-                              index=0)
-    q_genre   = st.selectbox("🏷️ Genre",
-                              ["(semua genre)"] + all_genres,
-                              index=0)
-    
-    st.markdown("---")
-    view_mode = st.radio("Mode Tampilan",
-                          ["🖼️ Grid Sampul","📊 Tren Warna per Tahun","📈 Analisis Agregat", "Analisis Genre"],
-                          index=0)
-    n_covers = st.slider("Maks. sampul ditampilkan (Grid)", 6, MAX_COVERS, 24, 6)
-
-    st.markdown("---")
-    st.markdown("#### 📅 Filter Tahun")
-    min_y = int(df["TAHUN_TERBIT"].dropna().min())
-    max_y = int(df["TAHUN_TERBIT"].dropna().max())
-    min_y = max(min_y, 2000)   # default mulai 2000
-    sel_tahun = st.slider("Rentang Tahun Terbit",
-                           min_value=2000, max_value=2025,
-                           value=(2000, 2025), step=1)
-
-    st.markdown("---")
-    st.markdown("#### ⭐ Filter Rating")
-    sel_rating = st.slider("Rentang Rating (Goodreads)",
-                            min_value=1.0, max_value=5.0,
-                            value=(1.0, 5.0), step=0.05,
-                            format="%.2f")
-
-    st.markdown("---")
-    st.markdown("#### 🎨 Filter Warna")
-    sel_warna = st.multiselect("Kategori Warna Dominan",
-                                WARNA_ORDER,
-                                default=[])
-
-# ── FILTER ───────────────────────────────────────────────────────────────────
-mask = pd.Series(True, index=df.index)
-
-if q_judul.strip():
-    mask &= df["JUDUL"].str.contains(q_judul.strip(), case=False, na=False, regex=False)
-
-if q_penulis != "(semua penulis)":
-    mask &= df["PENULIS"].str.contains(q_penulis, case=False, na=False, regex=False)
-
-if q_genre != "(semua genre)":
-    mask &= df["GENRES"].str.contains(q_genre, na=False)
-
-mask &= (
-    df["TAHUN_TERBIT"].isna() |
-    ((df["TAHUN_TERBIT"] >= sel_tahun[0]) & (df["TAHUN_TERBIT"] <= sel_tahun[1]))
-)
-
-mask &= (
-    df["RATING_AVG"].isna() |
-    ((df["RATING_AVG"] >= sel_rating[0]) & (df["RATING_AVG"] <= sel_rating[1]))
-)
-
-if sel_warna:
-    mask &= df["warna_kategori"].isin(sel_warna)
-
-fdf = df[mask].copy()
-
-# TARUH DI SINI
-if sort_option == "Judul (A–Z)":
-    fdf = fdf.sort_values("JUDUL", ascending=True, na_position="last")
-
-elif sort_option == "Rating Tertinggi":
-    fdf = fdf.sort_values(
-        by=["RATING_AVG", "TOTAL_RATINGS"],
-        ascending=[False, False],
-        na_position="last"
+    st.markdown(
+        '<p style="font-family:\'Playfair Display\',serif;font-size:1.05rem;'
+        'font-weight:700;color:#1a1a2e;margin-bottom:0;">📚 Kartografi Sampul</p>'
+        '<p style="font-size:0.72rem;color:#9ca3af;margin-top:1px;">'
+        'Sastra Indonesia 2000–2025</p>',
+        unsafe_allow_html=True,
     )
 
-elif sort_option == "Tahun Terbaru":
-    fdf = fdf.sort_values(
-        by="TAHUN_TERBIT",
-        ascending=False,
-        na_position="last"
+    # Status modul
+    st.markdown('<div class="section-label" style="margin-top:0.6rem">Status Modul</div>',
+                unsafe_allow_html=True)
+    m1, m2, m3 = st.columns(3)
+    for col_w, lbl, ok in [(m1, "Warna", MA), (m2, "Typeface", MB), (m3, "Ilustrasi", MC)]:
+        col_w.markdown(
+            f'<div style="text-align:center;font-size:0.68rem;">'
+            f'{"✅" if ok else "⏳"}<br>{lbl}</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+    st.markdown('<div class="section-label">Navigasi</div>', unsafe_allow_html=True)
+    PAGE = st.radio("", [
+        "🗺️  Ringkasan",
+        "🎨  Warna",
+        "🔤  Typeface",
+        "🖼️  Ilustrasi",
+        "📊  Genre & Tren",
+        "⭐  Rating & Agregat",
+        "📖  Jelajah Buku",
+    ], label_visibility="collapsed")
+
+    st.divider()
+    st.markdown('<div class="section-label">Filter Global</div>', unsafe_allow_html=True)
+
+    all_genres = ["Semua"] + get_all_genres(df_raw, C["genre"]) if C["genre"] else ["Semua"]
+    sel_genre = st.selectbox("Genre", all_genres)
+
+    # Rentang tahun — hindari karakter em-dash langsung di f-string
+    sel_year = (2000, 2025)
+    if C["year"]:
+        yv = df_raw[C["year"]][df_raw[C["year"]].between(1990, 2030)]
+        if len(yv) > 0:
+            y_min = int(yv.min())
+            y_max = int(yv.max())
+            sel_year = st.slider("Tahun terbit", y_min, y_max, (y_min, y_max))
+
+    st.divider()
+    st.markdown(
+        '<div style="font-size:0.68rem;color:#9ca3af;line-height:1.7;">'
+        '<b>Rujukan:</b><br>'
+        'Arnold &amp; Tilton (2023) <i>Distant Viewing</i><br>'
+        'Lupton (2024) <i>Thinking with Type</i><br>'
+        'Genette (1997) <i>Paratexts</i><br>'
+        'Manovich (2020) <i>Cultural Analytics</i>'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
-elif sort_option == "Paling Populer":
-    fdf = fdf.sort_values(
-        by="POPULARITY_SCORE",
-        ascending=False,
-        na_position="last"
+
+# ── Filter df ─────────────────────────────────────────────────────────────────
+df = filter_genre(df_raw, C["genre"], sel_genre)
+if C["year"]:
+    df = df[df[C["year"]].between(sel_year[0], sel_year[1])]
+df = df.reset_index(drop=True)
+N = len(df)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE: RINGKASAN
+# ═════════════════════════════════════════════════════════════════════════════
+if "Ringkasan" in PAGE:
+    st.markdown('<div class="hero-title">Kartografi Sampul Sastra Indonesia</div>',
+                unsafe_allow_html=True)
+    st.markdown(
+        '<div class="hero-sub">Pipeline komputasional: K-Means Warna · '
+        'Typeface CLIP · YOLOv8 + DETR + CLIP Ilustrasi</div>',
+        unsafe_allow_html=True,
     )
 
-# ── HEADER ───────────────────────────────────────────────────────────────────
-st.title("📚 Warna Wajah Sastra Indonesia: Analisis Warna Sampul Buku Sastra Indonesia")
+    # Stat chips
+    yr_str = "—"
+    if C["year"]:
+        yv2 = df[C["year"]][df[C["year"]].between(1990, 2030)]
+        if len(yv2) > 0:
+            yr_str = str(int(yv2.min())) + chr(8211) + str(int(yv2.max()))
 
-# Metrics row
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Jumlah Buku", f"{len(fdf):,}")
-c2.metric("Penulis",   f"{fdf['PENULIS'].nunique():,}")
-c3.metric("Rata-rata rating", f"{fdf['RATING_AVG'].mean():.2f}" if fdf["RATING_AVG"].notna().any() else "—")
-top_w = fdf["warna_kategori"].value_counts().idxmax() if len(fdf) > 0 else "—"
-c4.metric("Warna dominan terbanyak", top_w)
+    n_g    = len(get_all_genres(df, C["genre"])) if C["genre"] else "—"
+    rat_m  = ""
+    if C["rating"]:
+        rv = pd.to_numeric(df[C["rating"]], errors="coerce").dropna()
+        rat_m = f"{rv.mean():.2f}" if len(rv) > 0 else "—"
 
-st.markdown("---")
+    chips = [(str(N), "Buku"), (yr_str, "Tahun"), (str(n_g), "Genre"), (rat_m or "—", "Rating rata-rata")]
+    st.markdown(
+        '<div class="stat-row">' +
+        "".join(f'<div class="stat-chip"><div class="num">{v}</div>'
+                f'<div class="lbl">{l}</div></div>' for v, l in chips) +
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
-if len(fdf) == 0:
-    st.warning("Tidak ada buku yang cocok dengan filter yang dipilih.")
-    st.stop()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# VIEW: GRID SAMPUL
-# ─────────────────────────────────────────────────────────────────────────────
-if view_mode == "🖼️ Grid Sampul":
-    # --- Dynamic label ---
-
-    # --- Dynamic label ---
-    label_parts = []
-
-    if sort_option:
-        label_parts.append(sort_option)
-
-    if q_penulis != "(semua penulis)":
-        label_parts.append(f"Penulis: {q_penulis}")
-
-    if q_genre != "(semua genre)":
-        label_parts.append(f"Genre: {q_genre}")
-
-    if sel_warna:
-        label_parts.append("Warna: " + ", ".join(sel_warna))
-
-    label_parts.append(f"Terbitan Tahun: {sel_tahun[0]}–{sel_tahun[1]}")
-
-    label_text = " ".join(label_parts)
-
-    st.subheader(f"Sampul Buku {label_text}")
-    st.caption("⭐: rating · 👥: jumlah pemberi rating · 🔥: popularity · 🎨: warna dominan")
-
-    # GRID
-    subset = fdf.head(n_covers)
-    cols_per_row = 6
-    rows = [subset.iloc[i:i+cols_per_row] for i in range(0, len(subset), cols_per_row)]
-
-    subset = fdf.head(n_covers)
-    cols_per_row = 6
-    rows = [subset.iloc[i:i+cols_per_row] for i in range(0, len(subset), cols_per_row)]
-
-    for row_df in rows:
-        cols = st.columns(cols_per_row)
-        for col, (_, book) in zip(cols, row_df.iterrows()):
-            with col:
-                img_path = get_cover_path(book["NAMA_FILE_GAMBAR"])
-                if os.path.exists(img_path):
-                    try:
-                        img = Image.open(img_path)
-                        st.image(img, use_container_width=True)
-                    except:
-                        st.markdown("*(sampul tidak dapat dibuka)*")
-                else:
-                    # Placeholder berwarna sesuai warna dominan
-                    hex_c = str(book.get("warna_hex_dominan","#cccccc"))
-                    st.markdown(
-                        f'<div style="background:{hex_c};height:120px;'
-                        f'border-radius:6px;display:flex;align-items:center;'
-                        f'justify-content:center;color:white;font-size:20px;">'
-                        f'Sampul</div>',
-                        unsafe_allow_html=True
-                    )
-                palette = palette_dict.get(book.name)
-
-                # Palette strip
-                palette = palette_dict.get(book.name)
-
-                if palette:
-                    bars = ""
-                    for hex_color, pct in palette:
-                        width = pct * 100
-                        percent_text = f"{pct*100:.1f}%"    
-                        cat = map_to_color_category(hex_color)
-                        bars += f'''
-                <div title="{cat} | {percent_text}"
-                    style="width:{width}%;height:18px;background:{hex_color};cursor:pointer;">
-                </div>
-                '''
-                    bars_html = f"""
-                <div style="display:flex;border-radius:3px;overflow:hidden;margin:4px 0;position:relative;z-index:10;">
-                {bars}
-                </div>
-                """
-
-                    st.markdown(bars_html, unsafe_allow_html=True)
-                        
-                else:
-                    # fallback lama
-                    hex_c = str(book.get("warna_hex_dominan", "#cccccc"))
-                    st.markdown(
-                        f'<div style="height:10px;background:{hex_c};border-radius:3px;"></div>',
-                        unsafe_allow_html=True
-                    )
-
-                # Caption
-                judul  = str(book["JUDUL"])[:30]
-                rating = book.get("RATING_AVG")
-                tahun  = int(book["TAHUN_TERBIT"]) if pd.notna(book.get("TAHUN_TERBIT")) else "—"
-                warna  = str(book.get("warna_kategori","—"))
-                pop = book.get("POPULARITY_SCORE")
-                p_str = f"🔥 {pop:.2f}" if pd.notna(pop) else "🔥 —"
-                r_str  = f"⭐ {rating:.2f}/5" if pd.notna(rating) else "⭐ —"
-                total = book.get("TOTAL_RATINGS")
-                t_str = f"👥 {int(total):,}" if pd.notna(total) else "👥 —"
-                st.caption(f"**{judul}**  \n⭐ {rating:.2f} · {tahun}  \n{t_str}  \n🔥 {pop:.2f}  \n🎨 {warna}")
-
-    if len(fdf) > n_covers:
-        st.info(f"Menampilkan {n_covers} dari {len(fdf)} buku. Perkecil filter untuk hasil lebih spesifik.")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# VIEW: TREN WARNA PER TAHUN
-# ─────────────────────────────────────────────────────────────────────────────
-elif view_mode == "📊 Tren Warna per Tahun":
-    st.subheader("Tren Distribusi Warna Sampul per Tahun Terbit")
-    st.caption("Menampilkan distribusi palet warna dominan dalam kurun tahun yang dipilih. "
-               "Bukan daftar sampul — melainkan persentase kategori warna per tahun.")
-
-    df_yr = fdf.dropna(subset=["TAHUN_TERBIT","warna_kategori"]).copy()
-    df_yr["TAHUN_TERBIT"] = df_yr["TAHUN_TERBIT"].astype(int)
-
-    if len(df_yr) < 5:
-        st.warning("Terlalu sedikit data untuk menampilkan tren. Perluas filter tahun atau warna.")
-    else:
-        # ── Stacked bar chart ─────────────────────────────────────────────
-        fig_bar = make_bar_chart(
-            df_yr, x_col="TAHUN_TERBIT",
-            title=f"Komposisi Warna Dominan Sampul per Tahun ({sel_tahun[0]}–{sel_tahun[1]})",
-            xlabel="Tahun Terbit",
-            normalize=True
-        )
-        st.pyplot(fig_bar)
-
-        # ── Line chart: persentase warna tertentu ─────────────────────────
-        st.markdown("#### Tren Tiap Kategori Warna (% per tahun)")
-        pivot = pd.crosstab(df_yr["TAHUN_TERBIT"], df_yr["warna_kategori"])
-        pivot_pct = pivot.div(pivot.sum(axis=1), axis=0) * 100
-
-        cats_sel = st.multiselect(
-            "Tampilkan kategori warna:",
-            [c for c in WARNA_ORDER if c in pivot_pct.columns],
-            default=[c for c in ["Merah","Biru","Abu-abu/Putih"] if c in pivot_pct.columns]
-        )
-        if cats_sel:
-            fig_line, ax = plt.subplots(figsize=(12, 4))
-            for cat in cats_sel:
-                ax.plot(pivot_pct.index, pivot_pct[cat],
-                        color=WARNA_HEX.get(cat,"#888"),
-                        linewidth=2, marker="o", markersize=3.5, label=cat)
-            ax.set_xlabel("Tahun", fontsize=9)
-            ax.set_ylabel("%", fontsize=9)
-            ax.set_title("Persentase Warna per Tahun", fontsize=10, fontweight="bold")
-            ax.legend(fontsize=8, frameon=False, bbox_to_anchor=(1.01,1), loc="upper left")
-            ax.tick_params(axis="x", rotation=45, labelsize=7)
-            ax.spines[["top","right"]].set_visible(False)
-            ax.grid(axis="y", alpha=0.25, ls="--")
-            fig_line.tight_layout()
-            st.pyplot(fig_line)
-
-        # ── Rata-rata hex warna per tahun (color strip) ───────────────────
-        st.markdown("#### Rata-rata Warna Dominan per Tahun")
-        st.caption("Setiap strip = rata-rata RGB dari semua sampul yang terbit tahun tersebut.")
-
-        df_rgb = fdf.dropna(subset=["TAHUN_TERBIT","warna_r","warna_g","warna_b"]).copy()
-        df_rgb["TAHUN_TERBIT"] = df_rgb["TAHUN_TERBIT"].astype(int)
-        avg_rgb = (df_rgb.groupby("TAHUN_TERBIT")[["warna_r","warna_g","warna_b"]]
-                   .mean().round().astype(int).reset_index())
-        avg_rgb = avg_rgb[(avg_rgb["TAHUN_TERBIT"] >= sel_tahun[0]) &
-                          (avg_rgb["TAHUN_TERBIT"] <= sel_tahun[1])]
-
-        if len(avg_rgb) > 0:
-            hex_list = [
-                "#{:02x}{:02x}{:02x}".format(r["warna_r"], r["warna_g"], r["warna_b"])
-                for _, r in avg_rgb.iterrows()
-            ]
-            fig_strip = make_palette_strip_fig(hex_list, width=14, height=0.7)
-            st.pyplot(fig_strip)
-
-            # Label tahun di bawah strip
-            year_labels = avg_rgb["TAHUN_TERBIT"].tolist()
-            n_labels = min(12, len(year_labels))
-            step     = max(1, len(year_labels)//n_labels)
-            labels_to_show = year_labels[::step]
-            st.caption("  |  ".join([str(y) for y in labels_to_show]))
-
-        # ── Tabel ringkasan ───────────────────────────────────────────────
-        with st.expander("📋 Tabel Data Tren Warna"):
-            pivot_display = pivot_pct.round(1)
-            st.dataframe(pivot_display.style.background_gradient(cmap="YlOrRd", axis=None),
-                         use_container_width=True)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# VIEW: ANALISIS AGREGAT
-# ─────────────────────────────────────────────────────────────────────────────
-elif view_mode == "📈 Analisis Agregat":
-    st.subheader("Analisis Agregat Warna — Hasil Filter")
-
-    col_a, col_b = st.columns([1, 1.4])
-
-    with col_a:
-        # Donut
-        counts = fdf["warna_kategori"].value_counts().to_dict()
-        fig_donut = make_donut_chart(counts, title="Distribusi Kategori Warna")
-        st.pyplot(fig_donut)
-
-        # Palette strip: all dominant colors in filter
-        hex_vals = fdf["warna_hex_dominan"].dropna().tolist()
-        # Sort by hue
-        def hue_sort_key(h):
-            rgb = hex_to_rgb_tuple(h)
-            import colorsys
-            return colorsys.rgb_to_hsv(rgb[0]/255,rgb[1]/255,rgb[2]/255)[0]
-        hex_sorted = sorted(hex_vals, key=hue_sort_key)
-        if hex_sorted:
-            st.markdown("**Semua warna dominan (urut hue):**")
-            fig_all = make_palette_strip_fig(hex_sorted, width=10, height=0.5)
-            st.pyplot(fig_all)
-
-    with col_b:
-        # Scatter HSV
-        fig_sc = make_scatter_hsv(fdf)
-        st.pyplot(fig_sc)
-
-    st.markdown("---")
-
-    # Rating per warna
-    col_c, col_d = st.columns(2)
-    with col_c:
-        fig_rating = make_rating_bar(fdf)
-        st.pyplot(fig_rating)
-
-    with col_d:
-        # Warna per genre (top 8)
-        df_genre_exploded = fdf.copy()
-        df_genre_exploded["GENRE_SINGLE"] = df_genre_exploded["GENRES"].str.split(",")
-        df_genre_exploded = df_genre_exploded.explode("GENRE_SINGLE")
-        df_genre_exploded["GENRE_SINGLE"] = df_genre_exploded["GENRE_SINGLE"].str.strip()
-        top_genres = df_genre_exploded["GENRE_SINGLE"].value_counts().head(8).index
-        df_top = df_genre_exploded[df_genre_exploded["GENRE_SINGLE"].isin(top_genres)]
-
-        if len(df_top) > 5:
-            pivot_g = pd.crosstab(df_top["GENRE_SINGLE"], df_top["warna_kategori"])
-            pivot_g = pivot_g.div(pivot_g.sum(axis=1), axis=0) * 100
-            cats_g  = [c for c in WARNA_ORDER if c in pivot_g.columns]
-            pivot_g = pivot_g[cats_g]
-
-            fig_g, ax_g = plt.subplots(figsize=(6, 4))
-            bottom = np.zeros(len(pivot_g))
-            for cat in cats_g:
-                vals = pivot_g[cat].values
-                ax_g.barh(pivot_g.index, vals, left=bottom,
-                          color=WARNA_HEX[cat], label=cat, height=0.7)
-                bottom += vals
-            ax_g.set_xlabel("%", fontsize=9)
-            ax_g.set_title("Warna Dominan per Genre (top 8)",
-                           fontsize=9, fontweight="bold")
-            ax_g.tick_params(axis="y", labelsize=7)
-            ax_g.spines[["top","right"]].set_visible(False)
-            handles = [mpatches.Patch(color=WARNA_HEX[c], label=c) for c in cats_g]
-            ax_g.legend(handles=handles, fontsize=6, frameon=False,
-                        bbox_to_anchor=(1.01,1), loc="upper left")
-            fig_g.tight_layout()
-            st.pyplot(fig_g)
-
-    st.markdown("---")
-
-    # Raw data table
-    with st.expander("📋 Tabel Data (hasil filter)"):
-        cols_show = ["JUDUL","PENULIS","RATING_AVG","TAHUN_TERBIT",
-                     "GENRES","warna_kategori","warna_hex_dominan"]
-        st.dataframe(
-            fdf[cols_show].rename(columns={
-                "JUDUL":"Judul","PENULIS":"Penulis",
-                "RATING_AVG":"Rating","TAHUN_TERBIT":"Tahun",
-                "GENRES":"Genre","warna_kategori":"Warna",
-                "warna_hex_dominan":"Hex"
-            }).sort_values("Rating", ascending=False),
-            use_container_width=True
-        )
-        st.download_button(
-            "⬇️ Download CSV hasil filter",
-            data=fdf.to_csv(index=False, encoding="utf-8"),
-            file_name="hasil_filter_warna.csv",
-            mime="text/csv"
+    if not MA and not MB and not MC:
+        st.markdown(
+            '<div class="note-box">⏳ Analisis belum tersedia. '
+            'Jalankan pipeline di Colab terlebih dahulu, lalu upload data.csv.</div>',
+            unsafe_allow_html=True,
         )
 
-# ─────────────────────────────────────────────────────────────────────────────
-# VIEW: ANALISIS GENRE
-# ─────────────────────────────────────────────────────────────────────────────
-elif view_mode == "🏷️ Analisis Genre":
-    st.subheader("Analisis Genre Buku")
+    # Tiga distribusi
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown('<div class="section-title">Warna Dominan</div>', unsafe_allow_html=True)
+        if MA and "WARNA_KATEGORI" in df.columns:
+            st.plotly_chart(simple_bar(df["WARNA_KATEGORI"], WARNA_HEX, h=270),
+                            use_container_width=True, key="rs_a")
+        else:
+            st.caption("⏳ Modul A belum tersedia")
+    with c2:
+        st.markdown('<div class="section-title">Kategori Typeface</div>', unsafe_allow_html=True)
+        if MB and C["tf"] and C["tf"] in df.columns:
+            st.plotly_chart(simple_bar(df[C["tf"]], TYPEFACE_COLOR, h=270),
+                            use_container_width=True, key="rs_b")
+        else:
+            st.caption("⏳ Modul B belum tersedia")
+    with c3:
+        st.markdown('<div class="section-title">Gaya Ilustrasi</div>', unsafe_allow_html=True)
+        if MC and "GAYA_ILUSTRASI" in df.columns:
+            st.plotly_chart(simple_bar(df["GAYA_ILUSTRASI"], GAYA_COLOR, orient="h", h=270),
+                            use_container_width=True, key="rs_c")
+        else:
+            st.caption("⏳ Modul C belum tersedia")
 
-    # ── PREP DATA ─────────────────────────
-    if fdf.empty:
-        st.warning("Tidak ada data setelah filter.")
+    # Tren warna per tahun
+    if MA and C["year"] and "WARNA_KATEGORI" in df.columns:
+        st.markdown('<div class="section-title">Tren Warna Dominan per Tahun</div>',
+                    unsafe_allow_html=True)
+        df_tr = df[df[C["year"]].between(1990, 2030)]
+        tren = df_tr.groupby([C["year"], "WARNA_KATEGORI"]).size().reset_index(name="n")
+        fig_tr = px.area(tren, x=C["year"], y="n", color="WARNA_KATEGORI",
+                         color_discrete_map=WARNA_HEX,
+                         labels={C["year"]: "Tahun", "n": "Jumlah", "WARNA_KATEGORI": "Warna"})
+        fig_tr.update_layout(**PLOTLY_BASE, showlegend=True,
+                              legend=dict(orientation="h", y=-0.2), height=290)
+        st.plotly_chart(fig_tr, use_container_width=True, key="rs_tren")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE: WARNA
+# ═════════════════════════════════════════════════════════════════════════════
+elif "Warna" in PAGE:
+    st.markdown('<div class="hero-title">Modul A — Analisis Warna</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="hero-sub">K-Means k=5 pada ruang warna HSV · '
+        'Rujukan: Arnold &amp; Tilton (2023) <i>Distant Viewing</i></div>',
+        unsafe_allow_html=True,
+    )
+    if not MA:
+        st.info("⏳ Data Modul A belum tersedia dalam data.csv.")
         st.stop()
 
-    df_genre = fdf.copy()
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown('<div class="section-title">Distribusi Warna Dominan</div>', unsafe_allow_html=True)
+        if "WARNA_KATEGORI" in df.columns:
+            vc = df["WARNA_KATEGORI"].value_counts().reset_index()
+            vc.columns = ["warna", "n"]
+            fig_pie = px.pie(vc, names="warna", values="n", hole=0.4,
+                             color="warna", color_discrete_map=WARNA_HEX)
+            fig_pie.update_traces(texttemplate="%{label}<br>%{percent:.1%}")
+            fig_pie.update_layout(**PLOTLY_BASE, height=340)
+            st.plotly_chart(fig_pie, use_container_width=True, key="wa_pie")
 
-    # pastikan tidak ada NaN
-    df_genre = df_genre[df_genre["GENRES"].notna()]
+    with c2:
+        st.markdown('<div class="section-title">Kecerahan vs Saturasi</div>', unsafe_allow_html=True)
+        if "BRIGHTNESS_MEAN" in df.columns and "SATURATION_MEAN" in df.columns:
+            dsc = df.dropna(subset=["BRIGHTNESS_MEAN", "SATURATION_MEAN"])
+            smp = dsc.sample(min(600, len(dsc)), random_state=42)
+            fig_sc = px.scatter(
+                smp, x="BRIGHTNESS_MEAN", y="SATURATION_MEAN",
+                color="WARNA_KATEGORI" if "WARNA_KATEGORI" in smp.columns else None,
+                color_discrete_map=WARNA_HEX, opacity=0.55,
+                hover_data=[C["title"]] if C["title"] else None,
+                labels={"BRIGHTNESS_MEAN": "Kecerahan", "SATURATION_MEAN": "Saturasi",
+                        "WARNA_KATEGORI": "Warna"},
+            )
+            fig_sc.update_layout(**PLOTLY_BASE, height=340)
+            st.plotly_chart(fig_sc, use_container_width=True, key="wa_sc")
 
-    # split genre
-    df_genre["GENRE_LIST"] = df_genre["GENRES"].astype(str).str.split(",")
-    df_genre = df_genre.explode("GENRE_LIST")
+    # Proporsi klaster rata-rata
+    pct_avail = [f"WARNA_PCT_{i}" for i in range(1, 6) if f"WARNA_PCT_{i}" in df.columns]
+    if pct_avail:
+        st.markdown('<div class="section-title">Proporsi Rata-Rata Klaster K-Means</div>',
+                    unsafe_allow_html=True)
+        means = df[pct_avail].mean().reset_index()
+        means.columns = ["k", "pct"]
+        means["k"] = means["k"].str.replace("WARNA_PCT_", "Klaster ")
+        fig_k = px.bar(means, x="k", y="pct", text="pct",
+                       color_discrete_sequence=["#3b82f6"])
+        fig_k.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+        fig_k.update_layout(**PLOTLY_BASE, height=250)
+        st.plotly_chart(fig_k, use_container_width=True, key="wa_kl")
 
-    # bersihkan teks
-    df_genre["GENRE_LIST"] = df_genre["GENRE_LIST"].astype(str).str.strip()
+    # Tren per tahun
+    if C["year"] and "WARNA_KATEGORI" in df.columns:
+        st.markdown('<div class="section-title">Tren Warna Dominan per Tahun</div>',
+                    unsafe_allow_html=True)
+        dtr = df[df[C["year"]].between(1990, 2030)]
+        tren = dtr.groupby([C["year"], "WARNA_KATEGORI"]).size().reset_index(name="n")
+        fig_tr = px.bar(tren, x=C["year"], y="n", color="WARNA_KATEGORI",
+                        color_discrete_map=WARNA_HEX, barmode="stack",
+                        labels={C["year"]: "Tahun", "n": "Jumlah", "WARNA_KATEGORI": "Warna"})
+        fig_tr.update_layout(**PLOTLY_BASE, showlegend=True,
+                              legend=dict(orientation="h", y=-0.2), height=310)
+        st.plotly_chart(fig_tr, use_container_width=True, key="wa_tr")
 
-    # buang yang kosong
-    df_genre = df_genre[df_genre["GENRE_LIST"] != ""]
+    # Sample cover + palet
+    if C["img"] and "WARNA_HEX_1" in df.columns:
+        st.markdown('<div class="section-title">Contoh Sampul &amp; Palet</div>',
+                    unsafe_allow_html=True)
+        df_smp = df[df[C["img"]].str.strip().ne("")].sample(min(8, len(df)), random_state=7)
+        cols = st.columns(4)
+        for idx, (_, row) in enumerate(df_smp.iterrows()):
+            with cols[idx % 4]:
+                p = cover_path(row[C["img"]])
+                if os.path.exists(p):
+                    st.image(p, use_column_width=True)
+                t = str(row.get(C["title"], ""))[:30] if C["title"] else ""
+                st.markdown(palet_strip(row) + f'<p class="cover-title">{t}</p>',
+                            unsafe_allow_html=True)
 
-    if df_genre.empty:
-        st.warning("Genre tidak ditemukan di data ini.")
+    # Heatmap genre × warna
+    if C["genre"] and "WARNA_KATEGORI" in df.columns:
+        st.markdown('<div class="section-title">Warna Dominan per Genre</div>',
+                    unsafe_allow_html=True)
+        fig_h = heatmap_genre_x_col(df, C["genre"], "WARNA_KATEGORI", "YlOrRd")
+        if fig_h:
+            st.plotly_chart(fig_h, use_container_width=True, key="wa_heat")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE: TYPEFACE
+# ═════════════════════════════════════════════════════════════════════════════
+elif "Typeface" in PAGE:
+    st.markdown('<div class="hero-title">Modul B — Analisis Typeface</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="hero-sub">CLIP zero-shot + MSER text detection · '
+        '<i>Typeface</i> = entitas desain (Lupton 2024, hal. 54&#8211;57) · '
+        '6 kategori: serif · sans-serif · slab-serif · script · display · monospace</div>',
+        unsafe_allow_html=True,
+    )
+
+    if not MB or not C["tf"]:
+        st.info("⏳ Data Modul B belum tersedia dalam data.csv.")
         st.stop()
 
-    # ── KLASIFIKASI ─────────────────────────
-    def classify_genre_type(g):
-        g = g.lower()
+    TF  = C["tf"]
+    TFS = C["tf_skor"]
+    COV = "TEKS_COVERAGE" if "TEKS_COVERAGE" in df.columns else None
 
-        if g in ["novel","novella","cerita pendek","short stories","puisi","poetry","drama","komik","manga"]:
-            return "Jenis Karya"
-        elif g in ["romance","fantasy","horror","thriller","mystery","science fiction","fiction"]:
-            return "Fiksi"
-        elif g in ["biography","biografi","history","sejarah","philosophy","filsafat","psychology","agama","religion"]:
-            return "Non-Fiksi"
+    VALID_TF = {"serif", "sans-serif", "slab-serif", "script", "display", "monospace"}
+
+    # Normalise: underscore → hyphen, lowercase
+    df_tf = df.copy()
+    df_tf[TF] = df_tf[TF].str.lower().str.replace("_", "-").str.strip()
+    df_tf = df_tf[df_tf[TF].isin(VALID_TF)].reset_index(drop=True)
+
+    if len(df_tf) == 0:
+        st.warning(
+            "Tidak ada data typeface yang valid. "
+            "Nilai unik yang ditemukan di kolom tersebut:"
+        )
+        st.write(df[TF].value_counts())
+        st.stop()
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown('<div class="section-title">Distribusi Kategori Typeface</div>',
+                    unsafe_allow_html=True)
+        st.plotly_chart(simple_bar(df_tf[TF], TYPEFACE_COLOR, h=320),
+                        use_container_width=True, key="tf_dist")
+
+    with c2:
+        st.markdown('<div class="section-title">Confidence vs Coverage Teks</div>',
+                    unsafe_allow_html=True)
+        if TFS and COV and TFS in df_tf.columns and COV in df_tf.columns:
+            dsc2 = df_tf.dropna(subset=[TFS, COV])
+            smp2 = dsc2.sample(min(500, len(dsc2)), random_state=42)
+            fig_sc2 = px.scatter(
+                smp2, x=COV, y=TFS,
+                color=TF, color_discrete_map=TYPEFACE_COLOR, opacity=0.6,
+                hover_data=[C["title"]] if C["title"] else None,
+                labels={COV: "Coverage teks (proporsi area)",
+                        TFS: "Confidence CLIP", TF: "Typeface"},
+            )
+            fig_sc2.update_layout(**PLOTLY_BASE, showlegend=True,
+                                   legend=dict(orientation="h", y=-0.25), height=320)
+            st.plotly_chart(fig_sc2, use_container_width=True, key="tf_sc")
         else:
-            return "Tematik"
+            st.caption("Kolom confidence/coverage belum tersedia.")
 
-    df_genre["GENRE_TYPE"] = df_genre["GENRE_LIST"].apply(classify_genre_type)
+    # Tren per tahun
+    if C["year"] and TF in df_tf.columns:
+        st.markdown('<div class="section-title">Tren Typeface per Tahun</div>',
+                    unsafe_allow_html=True)
+        dtr = df_tf[df_tf[C["year"]].between(1990, 2030)]
+        tren_tf = dtr.groupby([C["year"], TF]).size().reset_index(name="n")
+        fig_ttr = px.bar(tren_tf, x=C["year"], y="n", color=TF,
+                         color_discrete_map=TYPEFACE_COLOR, barmode="stack",
+                         labels={C["year"]: "Tahun", "n": "Jumlah", TF: "Typeface"})
+        fig_ttr.update_layout(**PLOTLY_BASE, showlegend=True,
+                               legend=dict(orientation="h", y=-0.2), height=300)
+        st.plotly_chart(fig_ttr, use_container_width=True, key="tf_tren")
 
-    # ── METRICS ─────────────────────────
-    col1, col2, col3, col4 = st.columns(4)
+    # Heatmap genre
+    if C["genre"]:
+        st.markdown('<div class="section-title">Typeface per Genre</div>',
+                    unsafe_allow_html=True)
+        fig_th = heatmap_genre_x_col(df_tf, C["genre"], TF, "RdPu")
+        if fig_th:
+            st.plotly_chart(fig_th, use_container_width=True, key="tf_heat")
 
-    col1.metric("Total Genre", int(df_genre["GENRE_LIST"].nunique()))
-    col2.metric("Genre Tematik",
-                int(df_genre[df_genre["GENRE_TYPE"]=="Tematik"]["GENRE_LIST"].nunique()))
-    col3.metric("Jenis Karya",
-                int(df_genre[df_genre["GENRE_TYPE"]=="Jenis Karya"]["GENRE_LIST"].nunique()))
-    col4.metric("Total Buku", int(len(fdf)))
-
-    st.markdown("---")
-
-    # ── DISTRIBUSI GENRE TYPE ─────────────────────────
-    colA, colB = st.columns(2)
-
-    with colA:
-        st.markdown("### Distribusi Jenis Genre")
-
-        type_counts = df_genre["GENRE_TYPE"].value_counts()
-
-        if len(type_counts) > 0:
-            fig, ax = plt.subplots()
-            ax.pie(type_counts, labels=type_counts.index, autopct="%1.0f%%")
-            st.pyplot(fig)
-        else:
-            st.info("Tidak ada data untuk pie chart")
-
-    with colB:
-        st.markdown("### Top Genre")
-
-        top_genre = df_genre["GENRE_LIST"].value_counts().head(10)
-
-        if len(top_genre) > 0:
-            st.bar_chart(top_genre)
-        else:
-            st.info("Tidak ada data genre")
-
-    st.markdown("---")
-
-    # ── GENRE TEMATIK ─────────────────────────
-    st.markdown("### Genre Tematik Teratas")
-
-    tematik = df_genre[df_genre["GENRE_TYPE"]=="Tematik"]
-    tematik_counts = tematik["GENRE_LIST"].value_counts().head(15)
-
-    if len(tematik_counts) > 0:
-        st.bar_chart(tematik_counts)
-    else:
-        st.info("Tidak ada genre tematik")
-
-    st.markdown("---")
-
-    # ── GENRE VS WARNA ─────────────────────────
-    st.markdown("### Warna Dominan per Genre")
-
-    if "warna_kategori" not in df_genre.columns:
-        st.warning("Kolom warna_kategori tidak ditemukan.")
-    else:
-        df_g = df_genre.copy()
-
-        top_g = df_g["GENRE_LIST"].value_counts().head(8).index
-        df_g = df_g[df_g["GENRE_LIST"].isin(top_g)]
-
-        if len(df_g) > 0:
-            pivot = pd.crosstab(df_g["GENRE_LIST"], df_g["warna_kategori"])
-
-            if pivot.shape[0] > 0:
-                pivot = pivot.div(pivot.sum(axis=1), axis=0) * 100
-
-                fig, ax = plt.subplots(figsize=(8,4))
-                bottom = np.zeros(len(pivot))
-
-                for cat in WARNA_ORDER:
-                    if cat in pivot.columns:
-                        vals = pivot[cat].values
-                        ax.barh(pivot.index, vals, left=bottom,
-                                color=WARNA_HEX[cat], label=cat)
-                        bottom += vals
-
-                ax.set_xlabel("%")
-                ax.set_title("Distribusi Warna per Genre")
-                ax.legend(fontsize=6, bbox_to_anchor=(1.05,1))
-                st.pyplot(fig)
-            else:
-                st.info("Pivot kosong")
-        else:
-            st.info("Tidak cukup data untuk analisis warna vs genre")
+    # Ringkasan statistik
+    stat_tf = [c for c in [TFS, COV, "N_REGION_TEKS", "JUDUL_MATCH_SCORE"]
+               if c and c in df_tf.columns]
+    if stat_tf:
+        st.markdown('<div class="section-title">Statistik Deskriptif</div>', unsafe_allow_html=True)
+        st.dataframe(df_tf[stat_tf].describe().round(3), use_container_width=True)
 
 
-# ── FOOTER ────────────────────────────────────────────────────────────────────
-st.markdown("---")
-st.caption(
-    "Analisis warna Distant Reading (Tilton & Arnold 2023) & Cultural Analytics (Manovich 2020). "
-    "Warna diekstrak via KMeans (k=5) pada ruang RGB. "
-    "Kategorisasi warna berdasarkan rentang hue HSV."
-)
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE: ILUSTRASI
+# ═════════════════════════════════════════════════════════════════════════════
+elif "Ilustrasi" in PAGE:
+    st.markdown('<div class="hero-title">Modul C — Analisis Ilustrasi</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="hero-sub">YOLOv8n · DETR ResNet-50 · CLIP ViT-B/32 zero-shot · '
+        'Rujukan: Arnold &amp; Tilton (2023) <i>Distant Viewing</i> 2.4</div>',
+        unsafe_allow_html=True,
+    )
+    if not MC:
+        st.info("⏳ Data Modul C belum tersedia.")
+        st.stop()
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown('<div class="section-title">Distribusi Gaya Ilustrasi</div>',
+                    unsafe_allow_html=True)
+        if "GAYA_ILUSTRASI" in df.columns:
+            st.plotly_chart(simple_bar(df["GAYA_ILUSTRASI"], GAYA_COLOR, orient="h", h=320),
+                            use_container_width=True, key="il_gaya")
+
+    with c2:
+        st.markdown('<div class="section-title">Figur Manusia: YOLO vs DETR</div>',
+                    unsafe_allow_html=True)
+        if "YOLO_ADA_MANUSIA" in df.columns and "DETR_ADA_MANUSIA" in df.columns:
+            def _bool(v):
+                return str(v).strip().lower() in ("true", "1", "yes")
+            dm = df.copy()
+            dm["_y"] = dm["YOLO_ADA_MANUSIA"].apply(_bool)
+            dm["_d"] = dm["DETR_ADA_MANUSIA"].apply(_bool)
+            n_tot = len(dm)
+            fig_mn = go.Figure([
+                go.Bar(name="Ada manusia",
+                       x=["YOLOv8n", "DETR"],
+                       y=[dm["_y"].sum(), dm["_d"].sum()],
+                       marker_color=["#ef4444", "#f97316"]),
+                go.Bar(name="Tidak ada",
+                       x=["YOLOv8n", "DETR"],
+                       y=[n_tot - dm["_y"].sum(), n_tot - dm["_d"].sum()],
+                       marker_color=["#e5e7eb", "#e5e7eb"]),
+            ])
+            fig_mn.update_layout(**PLOTLY_BASE, barmode="stack", height=320,
+                                  showlegend=True, legend=dict(orientation="h", y=-0.25))
+            st.plotly_chart(fig_mn, use_container_width=True, key="il_mn")
+            k = (dm["_y"] == dm["_d"]).sum()
+            st.caption(f"Konsistensi YOLO–DETR: {k}/{n_tot} ({k/n_tot*100:.1f}%)")
+
+    if "YOLO_N_OBJEK" in df.columns:
+        st.markdown('<div class="section-title">Distribusi Jumlah Objek (YOLOv8n)</div>',
+                    unsafe_allow_html=True)
+        obj_s = pd.to_numeric(df["YOLO_N_OBJEK"], errors="coerce").dropna()
+        fig_obj = px.histogram(obj_s, nbins=15, color_discrete_sequence=["#3b82f6"],
+                               labels={"value": "Jumlah Objek", "count": "Frekuensi"})
+        fig_obj.update_layout(**PLOTLY_BASE, height=250)
+        st.plotly_chart(fig_obj, use_container_width=True, key="il_obj")
+
+    if C["genre"] and "GAYA_ILUSTRASI" in df.columns:
+        st.markdown('<div class="section-title">Gaya Ilustrasi per Genre</div>',
+                    unsafe_allow_html=True)
+        fig_gh = heatmap_genre_x_col(df, C["genre"], "GAYA_ILUSTRASI", "Greens")
+        if fig_gh:
+            st.plotly_chart(fig_gh, use_container_width=True, key="il_heat")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE: GENRE & TREN
+# ═════════════════════════════════════════════════════════════════════════════
+elif "Genre" in PAGE:
+    st.markdown('<div class="hero-title">Genre &amp; Tren Temporal</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-sub">Distribusi genre multi-label · Tren penerbitan per tahun</div>',
+                unsafe_allow_html=True)
+
+    if C["genre"]:
+        st.markdown('<div class="section-title">Distribusi Genre (Top 20)</div>',
+                    unsafe_allow_html=True)
+        all_g_flat = []
+        for val in df[C["genre"]]:
+            all_g_flat.extend(expand_genres(str(val)))
+        vc_g = pd.Series(all_g_flat).value_counts().head(20).reset_index()
+        vc_g.columns = ["genre", "n"]
+        vc_g["pct"] = (vc_g["n"] / N * 100).round(1)
+        fig_gd = px.bar(vc_g, y="genre", x="n", orientation="h",
+                        text="pct", color="n", color_continuous_scale="Blues",
+                        labels={"n": "Jumlah", "genre": ""})
+        fig_gd.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+        fig_gd.update_layout(**PLOTLY_BASE, coloraxis_showscale=False, height=500)
+        st.plotly_chart(fig_gd, use_container_width=True, key="ge_dist")
+
+    if C["year"]:
+        st.markdown('<div class="section-title">Jumlah Buku per Tahun</div>',
+                    unsafe_allow_html=True)
+        dyr = df[df[C["year"]].between(1990, 2030)]
+        yrc = dyr[C["year"]].value_counts().sort_index().reset_index()
+        yrc.columns = ["tahun", "n"]
+        fig_yr = px.area(yrc, x="tahun", y="n",
+                         labels={"tahun": "Tahun", "n": "Jumlah Buku"},
+                         color_discrete_sequence=["#3b82f6"])
+        fig_yr.update_layout(**PLOTLY_BASE, height=270)
+        st.plotly_chart(fig_yr, use_container_width=True, key="ge_yr")
+
+    if C["genre"] and MA and "WARNA_KATEGORI" in df.columns:
+        st.markdown('<div class="section-title">Warna Dominan per Genre</div>',
+                    unsafe_allow_html=True)
+        fig_gwh = heatmap_genre_x_col(df, C["genre"], "WARNA_KATEGORI", "YlOrRd")
+        if fig_gwh:
+            st.plotly_chart(fig_gwh, use_container_width=True, key="ge_wh")
+
+    if C["genre"] and MC and "GAYA_ILUSTRASI" in df.columns:
+        st.markdown('<div class="section-title">Gaya Ilustrasi per Genre</div>',
+                    unsafe_allow_html=True)
+        fig_gih = heatmap_genre_x_col(df, C["genre"], "GAYA_ILUSTRASI", "Greens")
+        if fig_gih:
+            st.plotly_chart(fig_gih, use_container_width=True, key="ge_ih")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE: RATING & AGREGAT
+# ═════════════════════════════════════════════════════════════════════════════
+elif "Rating" in PAGE:
+    st.markdown('<div class="hero-title">Rating &amp; Agregat</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-sub">Statistik rating Goodreads · Korelasi atribut visual dengan rating</div>',
+                unsafe_allow_html=True)
+
+    if not C["rating"]:
+        st.info("Kolom rating tidak ditemukan di data.")
+        st.stop()
+
+    df_r = df.copy()
+    df_r[C["rating"]] = pd.to_numeric(df_r[C["rating"]], errors="coerce")
+    df_r = df_r[df_r[C["rating"]].between(0.5, 5.5)].reset_index(drop=True)
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Rating rata-rata", f"{df_r[C['rating']].mean():.2f}")
+    c2.metric("Median",           f"{df_r[C['rating']].median():.2f}")
+    c3.metric("Buku dengan rating", f"{len(df_r):,}")
+
+    st.markdown('<div class="section-title">Distribusi Rating</div>', unsafe_allow_html=True)
+    fig_rd = px.histogram(df_r, x=C["rating"], nbins=40,
+                          color_discrete_sequence=["#f97316"],
+                          labels={C["rating"]: "Rating Goodreads", "count": "Jumlah"})
+    fig_rd.update_layout(**PLOTLY_BASE, height=250)
+    st.plotly_chart(fig_rd, use_container_width=True, key="ra_hist")
+
+    # Per genre
+    if C["genre"]:
+        st.markdown('<div class="section-title">Rating Rata-Rata per Genre</div>',
+                    unsafe_allow_html=True)
+        rg_rows = []
+        for g in get_all_genres(df_r, C["genre"])[:18]:
+            sub = filter_genre(df_r, C["genre"], g)
+            rv  = pd.to_numeric(sub[C["rating"]], errors="coerce").dropna()
+            if len(rv) >= 5:
+                rg_rows.append({"Genre": g, "Rating": round(rv.mean(), 3), "N": len(rv)})
+        if rg_rows:
+            rg_df = pd.DataFrame(rg_rows).sort_values("Rating", ascending=False)
+            fig_rg = px.bar(rg_df, y="Genre", x="Rating", orientation="h",
+                            text="Rating", color="Rating",
+                            color_continuous_scale="RdYlGn",
+                            range_x=[3.0, 5.0],
+                            labels={"Rating": "Rating rata-rata"})
+            fig_rg.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+            fig_rg.update_layout(**PLOTLY_BASE, coloraxis_showscale=False,
+                                  height=max(300, len(rg_df) * 28 + 80))
+            st.plotly_chart(fig_rg, use_container_width=True, key="ra_genre")
+
+    # Per warna
+    if MA and "WARNA_KATEGORI" in df_r.columns:
+        st.markdown('<div class="section-title">Rating per Warna Dominan</div>',
+                    unsafe_allow_html=True)
+        rw = df_r.groupby("WARNA_KATEGORI")[C["rating"]].agg(["mean", "count"]).reset_index()
+        rw.columns = ["warna", "mean", "n"]
+        rw = rw[rw["n"] >= 5].sort_values("mean", ascending=False)
+        fig_rw = px.bar(rw, x="warna", y="mean", text="mean",
+                        color="warna", color_discrete_map=WARNA_HEX,
+                        labels={"mean": "Rating rata-rata", "warna": ""},
+                        range_y=[3.0, 5.0])
+        fig_rw.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+        fig_rw.update_layout(**PLOTLY_BASE, height=270)
+        st.plotly_chart(fig_rw, use_container_width=True, key="ra_warna")
+
+    # Per typeface
+    if MB and C["tf"] and C["tf"] in df_r.columns:
+        TF2 = C["tf"]
+        df_rtf = df_r.copy()
+        df_rtf[TF2] = df_rtf[TF2].str.lower().str.replace("_", "-")
+        df_rtf = df_rtf[df_rtf[TF2].isin({"serif","sans-serif","slab-serif",
+                                            "script","display","monospace"})]
+        st.markdown('<div class="section-title">Rating per Kategori Typeface</div>',
+                    unsafe_allow_html=True)
+        rt = df_rtf.groupby(TF2)[C["rating"]].agg(["mean","count"]).reset_index()
+        rt.columns = ["typeface", "mean", "n"]
+        rt = rt[rt["n"] >= 5].sort_values("mean", ascending=False)
+        fig_rt = px.bar(rt, x="typeface", y="mean", text="mean",
+                        color="typeface", color_discrete_map=TYPEFACE_COLOR,
+                        labels={"mean": "Rating rata-rata", "typeface": ""},
+                        range_y=[3.0, 5.0])
+        fig_rt.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+        fig_rt.update_layout(**PLOTLY_BASE, height=270)
+        st.plotly_chart(fig_rt, use_container_width=True, key="ra_tf")
+
+    # Per gaya ilustrasi
+    if MC and "GAYA_ILUSTRASI" in df_r.columns:
+        st.markdown('<div class="section-title">Rating per Gaya Ilustrasi</div>',
+                    unsafe_allow_html=True)
+        ri = df_r.groupby("GAYA_ILUSTRASI")[C["rating"]].agg(["mean","count"]).reset_index()
+        ri.columns = ["gaya", "mean", "n"]
+        ri = ri[ri["n"] >= 5].sort_values("mean", ascending=False)
+        fig_ri = px.bar(ri, x="gaya", y="mean", text="mean",
+                        color="gaya", color_discrete_map=GAYA_COLOR,
+                        labels={"mean": "Rating rata-rata", "gaya": ""},
+                        range_y=[3.0, 5.0])
+        fig_ri.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+        fig_ri.update_layout(**PLOTLY_BASE, height=270)
+        st.plotly_chart(fig_ri, use_container_width=True, key="ra_gaya")
+
+    # Top 10
+    if C["title"]:
+        st.markdown('<div class="section-title">Top 10 Rating Tertinggi</div>',
+                    unsafe_allow_html=True)
+        top_cols = [c for c in [C["title"], C["author"], C["year"],
+                                C["rating"], C["n_rating"]] if c and c in df_r.columns]
+        top10 = df_r.nlargest(10, C["rating"])[top_cols].copy()
+        top10["⭐"] = top10[C["rating"]].apply(star_rating)
+        st.dataframe(top10, use_container_width=True, hide_index=True)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PAGE: JELAJAH BUKU
+# ═════════════════════════════════════════════════════════════════════════════
+elif "Jelajah" in PAGE:
+    st.markdown('<div class="hero-title">Jelajah Buku</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-sub">Telusuri setiap sampul beserta hasil analisis</div>',
+                unsafe_allow_html=True)
+
+    cs1, cs2, cs3 = st.columns([3, 1, 1])
+    with cs1:
+        query = st.text_input("", placeholder="Cari judul atau penulis…",
+                              label_visibility="collapsed")
+    with cs2:
+        sort_opt = st.selectbox("", ["Terbaru", "Terlama", "Rating ↓", "Rating ↑"],
+                                label_visibility="collapsed")
+    with cs3:
+        n_per = st.selectbox("", [20, 40, 60], label_visibility="collapsed")
+
+    df_sh = df.copy()
+    if query:
+        mask = pd.Series([False] * len(df_sh), index=df_sh.index)
+        if C["title"]:  mask |= df_sh[C["title"]].str.contains(query, case=False, na=False)
+        if C["author"]: mask |= df_sh[C["author"]].str.contains(query, case=False, na=False)
+        df_sh = df_sh[mask]
+
+    if sort_opt == "Terbaru" and C["year"]:
+        df_sh = df_sh.sort_values(C["year"], ascending=False)
+    elif sort_opt == "Terlama" and C["year"]:
+        df_sh = df_sh.sort_values(C["year"], ascending=True)
+    elif sort_opt == "Rating ↓" and C["rating"]:
+        df_sh[C["rating"]] = pd.to_numeric(df_sh[C["rating"]], errors="coerce")
+        df_sh = df_sh.sort_values(C["rating"], ascending=False)
+    elif sort_opt == "Rating ↑" and C["rating"]:
+        df_sh[C["rating"]] = pd.to_numeric(df_sh[C["rating"]], errors="coerce")
+        df_sh = df_sh.sort_values(C["rating"], ascending=True)
+
+    df_sh = df_sh.reset_index(drop=True)
+    st.caption(f"{len(df_sh):,} buku ditemukan")
+
+    n_pages = max(1, (len(df_sh) - 1) // n_per + 1)
+    pg = st.selectbox(f"Halaman (dari {n_pages})", range(1, n_pages + 1)) if n_pages > 1 else 1
+    df_pg = df_sh.iloc[(pg - 1) * n_per: pg * n_per]
+
+    for chunk in [df_pg.iloc[i: i + 4] for i in range(0, len(df_pg), 4)]:
+        cols = st.columns(4)
+        for col_w, (_, book) in zip(cols, chunk.iterrows()):
+            with col_w:
+                if C["img"] and str(book.get(C["img"], "")) not in ("", "nan"):
+                    p = cover_path(book[C["img"]])
+                    if os.path.exists(p):
+                        st.image(p, use_column_width=True)
+
+                t  = str(book.get(C["title"],  ""))[:45] if C["title"]  else ""
+                au = str(book.get(C["author"], ""))[:28] if C["author"] else ""
+                yr = str(int(book.get(C["year"], 0))) \
+                     if C["year"] and str(book.get(C["year"], "0")) not in ("0", "", "nan") else ""
+                rv = float(book.get(C["rating"], 0) or 0) if C["rating"] else 0
+
+                wv = str(book.get("WARNA_KATEGORI", "")) if MA else ""
+                tv = str(book.get(C["tf"], "") if C["tf"] else "")
+                tv = tv.lower().replace("_", "-") if tv else ""
+                gv = str(book.get("GAYA_ILUSTRASI", "")) if MC else ""
+
+                valid_tf = {"serif","sans-serif","slab-serif","script","display","monospace"}
+                badges = ""
+                if wv and wv not in ("", "nan"):
+                    badges += f'<span class="badge tag-warna">🎨 {wv}</span>'
+                if tv and tv in valid_tf:
+                    badges += f'<span class="badge tag-typeface">🔤 {tv}</span>'
+                if gv and gv not in ("", "nan", "unknown"):
+                    badges += f'<span class="badge tag-gaya">🖼 {gv}</span>'
+
+                pal = palet_strip(book) if "WARNA_HEX_1" in book else ""
+                st.markdown(
+                    f'{pal}'
+                    f'<p class="cover-title">{t}</p>'
+                    f'<p class="cover-meta">{au}{" · " if au and yr else ""}{yr}</p>'
+                    f'<p class="cover-meta" style="color:#f59e0b">{star_rating(rv)}</p>'
+                    f'<div style="margin-top:3px">{badges}</div>'
+                    f'<div style="margin-bottom:1rem"></div>',
+                    unsafe_allow_html=True,
+                )
