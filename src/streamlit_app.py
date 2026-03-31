@@ -51,54 +51,72 @@ COVERS_DIR = os.path.join(os.path.dirname(BASE_DIR), "covers")
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;600&display=swap');
-  html, body, [class*="css"] { font-family: 'Source Sans 3', sans-serif; }
+
+  html, body, [class*="css"] { 
+    font-family: 'Source Sans 3', sans-serif; 
+  }
+
+  :root {
+    --text-color: var(--text-color);
+    --bg-color: var(--background-color);
+    --secondary-text: rgba(128,128,128,0.8);
+  }
+
   .hero-title {
     font-family: 'Playfair Display', serif;
-    font-size: 2rem; font-weight: 700; color: #1a1a2e; line-height: 1.2;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-color);
+    line-height: 1.2;
     margin-bottom: 0.2rem;
   }
-  .hero-sub { font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem; }
-  .section-label {
-    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.12em;
-    text-transform: uppercase; color: #9ca3af; margin-bottom: 0.3rem;
+
+  .hero-sub { 
+    font-size: 0.9rem; 
+    color: var(--secondary-text); 
+    margin-bottom: 0.5rem; 
   }
+
   .section-title {
-    font-family: 'Playfair Display', serif; font-size: 1.05rem;
-    font-weight: 600; color: #1a1a2e;
-    border-bottom: 2px solid #e5e7eb; padding-bottom: 0.3rem;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-color);
+    border-bottom: 1px solid rgba(128,128,128,0.2);
+    padding-bottom: 0.3rem;
     margin: 1.1rem 0 0.7rem 0;
   }
-  .badge {
-    display: inline-block; padding: 2px 7px; border-radius: 10px;
-    font-size: 0.7rem; font-weight: 600; margin: 1px 2px;
+
+  .cover-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-color);
   }
-  .tag-warna    { background: #dbeafe; color: #1d4ed8; }
-  .tag-typeface { background: #fce7f3; color: #9d174d; }
-  .tag-gaya     { background: #d1fae5; color: #065f46; }
-  .cover-title  {
-    font-size: 0.78rem; font-weight: 600; color: #111827;
-    line-height: 1.3; margin: 0.3rem 0 0.1rem;
+
+  .cover-meta {
+    font-size: 0.7rem;
+    color: var(--secondary-text);
   }
-  .cover-meta   { font-size: 0.69rem; color: #6b7280; margin: 0; }
-  .note-box {
-    background: #fffbeb; border-left: 3px solid #f59e0b;
-    padding: 0.6rem 0.9rem; border-radius: 0 6px 6px 0;
-    font-size: 0.82rem; color: #78350f; margin: 0.5rem 0;
-  }
-  .stat-row { display: flex; gap: 0.8rem; flex-wrap: wrap; margin: 0.8rem 0; }
+
   .stat-chip {
-    background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
-    padding: 0.5rem 1rem; text-align: center; min-width: 90px;
+    background: rgba(240,240,240,0.1);
+    border: 1px solid rgba(128,128,128,0.2);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    text-align: center;
   }
+
   .stat-chip .num {
     font-family: 'Playfair Display', serif;
-    font-size: 1.45rem; font-weight: 700; color: #111827;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-color);
   }
-  .stat-chip .lbl { font-size: 0.7rem; color: #6b7280; }
-  div[data-testid="stSidebar"] { background: #f9fafb; }
-</style>
-""", unsafe_allow_html=True)
 
+  div[data-testid="stSidebar"] {
+    background: var(--bg-color);
+  }
+</style>
 
 # ── Colour palettes ───────────────────────────────────────────────────────────
 WARNA_HEX = {
