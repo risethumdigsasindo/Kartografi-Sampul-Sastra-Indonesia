@@ -96,12 +96,12 @@ SHELF_REV = {v:k for k,v in SHELF_ID.items()}
 JENIS_KARYA = {"Sastra Indonesia","Fiksi","Nonfiksi","Novel","Puisi","Cerita Pendek","Sastra"}
 
 # ── Load data ────────────────────────────────────────────────
-DATA_PATH = os.path.join(os.path.dirname(__file__), "data.parquet")
+DATA_PATH = os.path.join(os.path.dirname(__file__), "data.csv")
 COVER_DIR = os.path.join(os.path.dirname(__file__), "..", "covers")
 
 @st.cache_data(show_spinner=False)
 def load_data(path):
-    d = pd.read_parquet(path)
+    d = pd.read_csv(path, sep=";", encoding="utf-8-sig", dtype=str)
     num_cols = ["YEAR","RATING","TOTAL_RATING","TOTAL_REVIEW",
                 "brightness_mean","saturation_mean","typeface_skor","gaya_skor",
                 "teks_coverage","n_region_teks","judul_match_score",
