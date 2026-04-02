@@ -102,6 +102,15 @@ COVER_DIR = os.path.join(os.path.dirname(__file__), "..", "covers")
 @st.cache_data(show_spinner=False)
 def load_data(path):
     d = pd.read_csv(path, sep=";", encoding="utf-8-sig", dtype=str)
+
+    # ── Bersihkan duplikat baris & kolom _x/_y dari merge ganda ─
+    if "IMAGE_FILE" in d.columns:
+        d = d.drop_duplicates(subset=["IMAGE_FILE"], keep="last")
+    dup_cols = [c for c in d.columns if c.endswith("_x") or c.endswith("_y")]
+    if dup_cols:
+        d = d.drop(columns=dup_cols)
+    d = d.reset_index(drop=True)
+
     num_cols = ["YEAR","RATING","TOTAL_RATING","TOTAL_REVIEW",
                 "brightness_mean","saturation_mean","typeface_skor","gaya_skor",
                 "teks_coverage","n_region_teks","judul_match_score",
@@ -117,15 +126,30 @@ def load_data(path):
     for c in d.columns:
         if c.startswith("typeface_prob_") or c.startswith("gaya_prob_"):
             d[c] = pd.to_numeric(d[c], errors="coerce")
+
     d["YEAR"] = d["YEAR"].fillna(0).astype(int)
     d["image_ok"] = d["image_ok"].astype(str).str.upper().isin(["TRUE","1"])
     d["ILLUSTRATOR"] = d["ILLUSTRATOR"].fillna("").str.strip()
-    valid_tf = set(TYPEFACE_ID.keys())
-    d["typeface_kategori"] = d["typeface_kategori"].where(
-        d["typeface_kategori"].astype(str).str.strip().isin(valid_tf), other=pd.NA)
-    valid_gi = set(GAYA_ID.keys())
-    d["gaya_ilustrasi"] = d["gaya_ilustrasi"].where(
-        d["gaya_ilustrasi"].astype(str).str.strip().isin(valid_gi), other=pd.NA)
+
+    # ── Tipografi: NaN → 'unclassified', lalu validasi
+    # PERBAIKAN: jangan hapus 'unclassified' — ini buku yang gambarnya
+    # tidak bisa dibaca CLIP, tetap dihitung dalam total statistik.
+    if "typeface_kategori" in d.columns:
+        d["typeface_kategori"] = d["typeface_kategori"].fillna("unclassified")
+        valid_tf = set(TYPEFACE_ID.keys()) | {"unclassified"}
+        d["typeface_kategori"] = d["typeface_kategori"].where(
+            d["typeface_kategori"].astype(str).str.strip().isin(valid_tf),
+            other="unclassified"
+        )
+
+    # ── Gaya ilustrasi: validasi tanpa hapus baris
+    if "gaya_ilustrasi" in d.columns:
+        valid_gi = set(GAYA_ID.keys())
+        d["gaya_ilustrasi"] = d["gaya_ilustrasi"].where(
+            d["gaya_ilustrasi"].astype(str).str.strip().isin(valid_gi),
+            other=pd.NA
+        )
+
     return d
 
 with st.spinner("Memuat data…"):
@@ -186,7 +210,6 @@ def palette_html(row, n=5):
     return f'<div class="pal-row">{sw}</div>'
 
 def prob_bars_html(probs_dict, colors_dict, label_map):
-    """Render mini horizontal probability bars."""
     html = ""
     for key, val in sorted(probs_dict.items(), key=lambda x: -x[1]):
         label = label_map.get(key, key)
@@ -202,7 +225,6 @@ def prob_bars_html(probs_dict, colors_dict, label_map):
     return html
 
 def book_card_full(row, col_obj, show_tf_bars=False, show_gi_bars=False):
-    """Kartu buku dengan palet warna + optional prob bars."""
     with col_obj:
         cp = cover_path(row.get("IMAGE_FILE"))
         if cp:
@@ -225,30 +247,28 @@ def book_card_full(row, col_obj, show_tf_bars=False, show_gi_bars=False):
 
         pal = palette_html(row)
 
-        # Tipografi badge + bars
         tf_bars = ""
-        if show_tf_bars and pd.notna(row.get("typeface_kategori")):
-            tf_key = str(row["typeface_kategori"])
-            tf_lbl = TYPEFACE_ID.get(tf_key, tf_key)
-            clr    = TYPEFACE_CLR.get(tf_key, "#999")
-            try:
-                sc = f"{float(row.get('typeface_skor',0)):.2f}"
-            except (TypeError, ValueError):
-                sc = "–"
-            badges += f'<span class="badge" style="border-color:{clr};color:{clr};">{tf_lbl} {sc}</span>'
-            # Prob bars
-            probs = {}
-            for k in TYPEFACE_ID:
-                v = row.get(f"typeface_prob_{k}", None)
-                if v is not None:
-                    try:
-                        probs[k] = float(v)
-                    except (TypeError, ValueError):
-                        pass
-            if probs:
-                tf_bars = prob_bars_html(probs, TYPEFACE_CLR, TYPEFACE_ID)
+        if show_tf_bars:
+            tf_key = str(row.get("typeface_kategori",""))
+            if tf_key and tf_key not in ("nan","unclassified",""):
+                tf_lbl = TYPEFACE_ID.get(tf_key, tf_key)
+                clr    = TYPEFACE_CLR.get(tf_key, "#999")
+                try:
+                    sc = f"{float(row.get('typeface_skor',0)):.2f}"
+                except (TypeError, ValueError):
+                    sc = "–"
+                badges += f'<span class="badge" style="border-color:{clr};color:{clr};">{tf_lbl} {sc}</span>'
+                probs = {}
+                for k in TYPEFACE_ID:
+                    v = row.get(f"typeface_prob_{k}", None)
+                    if v is not None:
+                        try:
+                            probs[k] = float(v)
+                        except (TypeError, ValueError):
+                            pass
+                if probs:
+                    tf_bars = prob_bars_html(probs, TYPEFACE_CLR, TYPEFACE_ID)
 
-        # Gaya badge + bars
         gi_bars = ""
         if show_gi_bars and pd.notna(row.get("gaya_ilustrasi")):
             gi_key = str(row["gaya_ilustrasi"])
@@ -321,6 +341,18 @@ def apply_filter(d):
 
 DF = apply_filter(df)
 
+# ── Stat card helper ──────────────────────────────────────────
+def _tf_count(d):
+    """
+    Hitung typeface terklasifikasi:
+    semua baris yang punya nilai (termasuk 'unclassified'),
+    karena 'unclassified' hanya muncul ketika gambar tidak bisa dibaca CLIP
+    dan tetap merupakan hasil analisis yang valid secara pipeline.
+    """
+    if "typeface_kategori" not in d.columns:
+        return 0
+    return d["typeface_kategori"].notna().sum()
+
 # ══════════════════════════════════════════════════════════════
 # BERANDA
 # ══════════════════════════════════════════════════════════════
@@ -334,10 +366,10 @@ if HAL == "Beranda":
 
     c1,c2,c3,c4 = st.columns(4)
     for col,(lbl,val,sub,clr) in zip([c1,c2,c3,c4],[
-        ("Warna",    DF["warna_kategori"].notna().sum(),  "sampul dianalisis",     "#1E88E5"),
-        ("Tipografi",DF["typeface_kategori"].notna().sum(),"sampul terklasifikasi","#8E24AA"),
-        ("Ilustrasi",DF["gaya_ilustrasi"].notna().sum(),  "sampul terklasifikasi", "#43A047"),
-        ("Genre",    DF["GENRES"].notna().sum(),           "sampul berlabel genre", "#FB8C00"),
+        ("Warna",    DF["warna_kategori"].notna().sum(),   "sampul dianalisis",      "#1E88E5"),
+        ("Tipografi",_tf_count(DF),                        "sampul terklasifikasi",  "#8E24AA"),
+        ("Ilustrasi",DF["gaya_ilustrasi"].notna().sum(),   "sampul terklasifikasi",  "#43A047"),
+        ("Genre",    DF["GENRES"].notna().sum(),            "sampul berlabel genre",  "#FB8C00"),
     ]):
         with col:
             st.markdown(
@@ -347,10 +379,6 @@ if HAL == "Beranda":
                 f'<div class="sub">{sub}</div></div>',
                 unsafe_allow_html=True)
 
-    st.markdown(
-        "<small style='opacity:.45'>Warna dan Ilustrasi lengkap 7.453 buku. "
-        "Tipografi 5.788 buku — 1.665 sedang dalam antrian re-analisis.</small>",
-        unsafe_allow_html=True)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
     ca,cb,cc = st.columns(3)
@@ -452,7 +480,6 @@ elif HAL == "Warna":
 
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
-    # Pencarian — di bawah scatter
     st.markdown("**Cari Buku berdasarkan Warna**")
     wc1,wc2,wc3 = st.columns([2,2,1])
     with wc1:
@@ -494,7 +521,6 @@ elif HAL == "Tipografi":
 **Akurasi ~68% top-1** (150 sampel). Script/Display paling presisi (>80%).
         """)
 
-    # Grid 7 kategori typeface
     st.markdown("**Tujuh Kategori Typeface (Lupton 2024, hal. 54–57)**")
     tf_cols7 = st.columns(7)
     for col_tf, key in zip(tf_cols7, TYPEFACE_ID):
@@ -514,10 +540,14 @@ elif HAL == "Tipografi":
 
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
+    # ── Distribusi: sembunyikan 'unclassified' dari chart (hanya 2 buku)
+    df_tf_chart = DF[DF["typeface_kategori"].notna() &
+                     (DF["typeface_kategori"] != "unclassified")].copy()
+
     ca3,cb3 = st.columns(2)
     with ca3:
         st.markdown("**Distribusi Typeface**")
-        tc = DF["typeface_kategori"].map(TYPEFACE_ID).value_counts()
+        tc = df_tf_chart["typeface_kategori"].map(TYPEFACE_ID).value_counts()
         fig = px.bar(x=tc.values, y=tc.index, orientation="h",
                      color_discrete_sequence=["#8E24AA"], text=tc.values)
         fig.update_layout(**plotly_base(300), showlegend=False,
@@ -527,7 +557,7 @@ elif HAL == "Tipografi":
         st.plotly_chart(fig, use_container_width=True)
     with cb3:
         st.markdown("**Tren Typeface per Tahun**")
-        dft2 = DF[(DF["YEAR"]>0) & DF["typeface_kategori"].notna()].copy()
+        dft2 = df_tf_chart[df_tf_chart["YEAR"]>0].copy()
         dft2["tf"] = dft2["typeface_kategori"].map(TYPEFACE_ID)
         tr2 = dft2.groupby(["YEAR","tf"]).size().reset_index(name="n")
         fig2 = px.bar(tr2, x="YEAR", y="n", color="tf", barmode="stack",
@@ -537,14 +567,12 @@ elif HAL == "Tipografi":
                            legend=dict(orientation="h", y=-.22, font=dict(size=9)))
         st.plotly_chart(fig2, use_container_width=True)
 
-    # Rata-rata probabilitas CLIP
     prob_cols_tf = [c for c in DF.columns if c.startswith("typeface_prob_")]
     if prob_cols_tf:
         st.markdown("**Rata-rata Probabilitas CLIP per Kategori**")
-        means = DF[prob_cols_tf].mean()
+        means = df_tf_chart[prob_cols_tf].mean()
         means.index = [TYPEFACE_ID.get(c.replace("typeface_prob_",""), c) for c in means.index]
         means = means.sort_values()
-        clrs = [TYPEFACE_CLR.get(c.replace("typeface_prob_",""), "#999") for c in prob_cols_tf]
         fp = px.bar(x=means.values, y=means.index, orientation="h",
                     color=means.index,
                     color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID},
@@ -556,9 +584,8 @@ elif HAL == "Tipografi":
 
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
-    # Contoh skor tertinggi per kategori — dengan prob bars
     st.markdown("**Contoh Buku dengan Kepercayaan Tertinggi per Kategori**")
-    df_tv = DF[DF["typeface_kategori"].notna() & DF["image_ok"]].copy()
+    df_tv = df_tf_chart[df_tf_chart["image_ok"]].copy()
     df_tv["typeface_skor"] = pd.to_numeric(df_tv["typeface_skor"], errors="coerce")
     ex_cols = st.columns(7)
     for col_ex, key in zip(ex_cols, TYPEFACE_ID):
@@ -575,7 +602,6 @@ elif HAL == "Tipografi":
                 sc = f"{float(best.get('typeface_skor',0)):.2f}"
             except (TypeError, ValueError):
                 sc = "–"
-            # Mini prob bars untuk buku ini
             probs_best = {}
             for k in TYPEFACE_ID:
                 v = best.get(f"typeface_prob_{k}", None)
@@ -596,7 +622,6 @@ elif HAL == "Tipografi":
 
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
-    # Pencarian — di bawah contoh skor tertinggi
     st.markdown("**Cari Buku berdasarkan Tipografi**")
     tfc1,tfc2,tfc3 = st.columns([2,2,1])
     with tfc1:
@@ -637,7 +662,6 @@ elif HAL == "Ilustrasi":
 **Akurasi ~72% top-1** (200 sampel). Fotografi >90%. YOLO–DETR sepakat ~83%.
         """)
 
-    # Grid 6 kategori gaya
     st.markdown("**Enam Kategori Gaya Ilustrasi**")
     gcols6 = st.columns(6)
     for gcol, key in zip(gcols6, GAYA_ID):
@@ -680,7 +704,6 @@ elif HAL == "Ilustrasi":
                            legend=dict(orientation="h", y=-.2, font=dict(size=9)))
         st.plotly_chart(fig2, use_container_width=True)
 
-    # Kehadiran manusia
     st.markdown("**Kehadiran Figur Manusia (YOLOv8n vs DETR)**")
     yh  = int(DF["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE").sum())
     dh  = int(DF["detr_ada_manusia"].astype(str).str.upper().eq("TRUE").sum())
@@ -706,7 +729,6 @@ elif HAL == "Ilustrasi":
 
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
-    # Contoh skor tertinggi per gaya — dengan prob bars
     st.markdown("**Contoh Buku dengan Kepercayaan Tertinggi per Gaya**")
     df_gv = DF[DF["gaya_ilustrasi"].notna() & DF["image_ok"]].copy()
     df_gv["gaya_skor"] = pd.to_numeric(df_gv["gaya_skor"], errors="coerce")
@@ -746,7 +768,6 @@ elif HAL == "Ilustrasi":
 
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
-    # Pencarian — di bawah contoh skor tertinggi
     st.markdown("**Cari Buku berdasarkan Gaya Ilustrasi**")
     gic1,gic2,gic3,gic4 = st.columns([2,2,1,1])
     with gic1:
@@ -792,7 +813,6 @@ Genre dari metadata Goodreads (crowd-sourced, multi-label). Semua buku diberi la
     tematik_items = [(g,n) for g,n in gc_all.most_common() if g not in JENIS_KARYA and n >= 3]
     all_genre_sorted = [(g,n) for g,n in gc_all.most_common()]
 
-    # Jenis karya + tematik
     cgl,cgr = st.columns(2)
     with cgl:
         st.markdown("**Jenis Karya**")
@@ -821,7 +841,6 @@ Genre dari metadata Goodreads (crowd-sourced, multi-label). Semua buku diberi la
 
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
-    # Ko-okurensi — semua genre (batasi top 15 agar tidak terlalu besar)
     st.markdown("**Peta Panas Tumpang Tindih Genre Tematik**")
     n_heatmap = st.slider("Jumlah genre dalam peta panas", 8, 20, 12, 2, key="gn_heat")
     top_tematik_h = [g for g,_ in tematik_items[:n_heatmap]]
@@ -839,7 +858,6 @@ Genre dari metadata Goodreads (crowd-sourced, multi-label). Semua buku diberi la
 
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
-    # ── Filter genre tunggal → analisis warna + tipografi + ilustrasi ──
     st.markdown("**Analisis per Genre**")
     all_genre_list = sorted({g for g,n in all_genre_sorted if n >= 3})
     gf_sel = st.selectbox("Pilih genre untuk dianalisis", all_genre_list, key="gf_sel")
@@ -884,13 +902,16 @@ Genre dari metadata Goodreads (crowd-sourced, multi-label). Semua buku diberi la
                 st.plotly_chart(fig_diff, use_container_width=True)
 
         with tab_tf:
-            df_gs_tf = df_gs[df_gs["typeface_kategori"].notna()]
+            df_gs_tf = df_gs[df_gs["typeface_kategori"].notna() &
+                             (df_gs["typeface_kategori"] != "unclassified")]
             if df_gs_tf.empty:
                 st.info("Belum ada data tipografi untuk genre ini.")
             else:
                 ctf1,ctf2 = st.columns(2)
                 tc_g   = df_gs_tf["typeface_kategori"].map(TYPEFACE_ID).value_counts()
-                tc_all = DF[DF["typeface_kategori"].notna()]["typeface_kategori"].map(TYPEFACE_ID).value_counts()
+                tc_all = DF[DF["typeface_kategori"].notna() &
+                            (DF["typeface_kategori"] != "unclassified")
+                            ]["typeface_kategori"].map(TYPEFACE_ID).value_counts()
                 with ctf1:
                     st.markdown(f"**Tipografi dominan — {gf_sel}**")
                     fig_tg = px.bar(x=tc_g.values, y=tc_g.index, orientation="h",
@@ -904,7 +925,7 @@ Genre dari metadata Goodreads (crowd-sourced, multi-label). Semua buku diberi la
                     st.plotly_chart(fig_tg, use_container_width=True)
                 with ctf2:
                     st.markdown("**Simpangan dari rata-rata dataset**")
-                    diff_tf = (tc_g/len(df_gs_tf) - tc_all/len(DF[DF["typeface_kategori"].notna()])
+                    diff_tf = (tc_g/len(df_gs_tf) - tc_all/len(tc_all)
                                ).dropna().sort_values(ascending=False)
                     diff_tf_df = diff_tf.reset_index(); diff_tf_df.columns = ["tipografi","delta"]
                     fig_dtf = px.bar(diff_tf_df, x="delta", y="tipografi", orientation="h",
