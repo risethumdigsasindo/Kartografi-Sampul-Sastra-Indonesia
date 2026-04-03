@@ -1,4 +1,3 @@
-
 """Kartografi Sampul Sastra Indonesia (2000-2025)"""
 import os
 from collections import Counter
@@ -87,14 +86,9 @@ def load_data(path):
     d.loc[d["ILLUSTRATOR"].isin(["nan","NaN","None"]), "ILLUSTRATOR"] = ""
     if "typeface_kategori" in d.columns:
         d["typeface_kategori"] = d["typeface_kategori"].fillna("unclassified")
-
     valid_tf = set(TYPEFACE_ID.keys()) | {"unclassified"}
-
     d["typeface_kategori"] = d["typeface_kategori"].where(
-        d["typeface_kategori"].astype(str).str.strip().isin(valid_tf),
-        other="unclassified"
-    )
-    
+        d["typeface_kategori"].astype(str).str.strip().isin(valid_tf), other="unclassified")
     d["gaya_ilustrasi"] = d["gaya_ilustrasi"].where(
         d["gaya_ilustrasi"].astype(str).str.strip().isin(set(GAYA_ID.keys())), other=pd.NA)
     return d
@@ -119,13 +113,32 @@ def genre_counts(d):
     for gl in expand_genres(d["GENRES"]): c.update(gl)
     return c
 
+# pb() identik dengan versi asli, hanya tambah color="#1A1A1A" di font
 def pb(height=320, **kw):
     b = dict(height=height, margin=dict(l=8,r=8,t=28,b=8),
-             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(size=11))
+             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+             font=dict(size=11, color="#1A1A1A"))
     b.update(kw)
     return b
 
+def _nama_warna(hex_str):
+    """Nama warna Indonesia terdekat via jarak RGB."""
+    try:
+        h = hex_str.lstrip("#")
+        r,g,b = int(h[0:2],16), int(h[2:4],16), int(h[4:6],16)
+    except: return hex_str
+    best, best_d = "lainnya", float("inf")
+    for nama, hx in WARNA_HEX.items():
+        try:
+            hh = hx.lstrip("#")
+            rr,gg,bb = int(hh[0:2],16), int(hh[2:4],16), int(hh[4:6],16)
+            dist = (r-rr)**2 + (g-gg)**2 + (b-bb)**2
+            if dist < best_d: best, best_d = nama, dist
+        except: pass
+    return best
+
 def palette_html(row, n=5):
+    """Palette bar — tooltip: nama warna + persentase, bukan kode hex."""
     parts, total = [], 0.0
     for i in range(1,n+1):
         hx = str(row.get(f"warna_hex_{i}","") or "").strip()
@@ -134,10 +147,14 @@ def palette_html(row, n=5):
         except: pct = 0.0
         if not hx or hx in ("nan",""): continue
         if not hx.startswith("#"): hx = "#"+hx
-        parts.append((hx,pct)); total += pct
+        nama = _nama_warna(hx)
+        parts.append((hx,pct,nama)); total += pct
     if not parts: return ""
     scale = 100.0/total if total>0 else 1.0
-    sw = "".join(f'<div class="pal-sw" style="background:{hx};width:{pct*scale:.1f}%;" title="{hx} {pct:.1f}%"></div>' for hx,pct in parts)
+    sw = "".join(
+        f'<div class="pal-sw" style="background:{hx};width:{pct*scale:.1f}%;" '
+        f'title="{nama} ({pct:.1f}%)"></div>'
+        for hx,pct,nama in parts)
     return f'<div class="pal-row">{sw}</div>'
 
 def prob_bars(probs_dict, colors_dict, label_map):
@@ -185,6 +202,92 @@ def grid(subset, n_cols=4, **kw):
         chunk = subset.iloc[start:start+n_cols]; cols = st.columns(n_cols)
         for j,(_, row) in enumerate(chunk.iterrows()): book_card(row, cols[j], **kw)
 
+# ── HELPER: Genre × Visual co-occurrence heatmaps ─────────────
+def _top_genres(d, n=12):
+    gc = genre_counts(d)
+    return [g for g,_ in gc.most_common(n)]
+
+def heatmap_warna_genre(d, top_n=12):
+    genres = _top_genres(d, top_n)
+    warna_keys = list(WARNA_HEX.keys())
+    mat = pd.DataFrame(0.0, index=genres, columns=warna_keys)
+    for genre in genres:
+        mask = d["GENRES"].apply(lambda x: genre in [g.strip() for g in str(x).split(",")])
+        sub = d[mask]
+        if len(sub) == 0: continue
+        vc = sub["warna_kategori"].value_counts(normalize=True)
+        for w in warna_keys:
+            mat.loc[genre, w] = vc.get(w, 0.0)
+    text_mat = (mat * 100).round(0).astype(int).astype(str) + "%"
+    fig = go.Figure(data=go.Heatmap(
+        z=mat.values, x=warna_keys, y=genres,
+        colorscale="YlOrRd",
+        text=text_mat.values, texttemplate="%{text}",
+        textfont=dict(size=9, color="#1A1A1A"),
+        hovertemplate="Genre: %{y}<br>Warna: %{x}<br>Proporsi: %{text}<extra></extra>",
+        showscale=True))
+    fig.update_layout(**pb(max(340, top_n*28),
+        margin=dict(l=140,r=20,t=32,b=60),
+        yaxis=dict(autorange="reversed"),
+        xaxis_title="", yaxis_title=""))
+    return fig
+
+def heatmap_tf_genre(d, top_n=12):
+    genres = _top_genres(d, top_n)
+    tf_keys = list(TYPEFACE_ID.keys())
+    tf_labels = [TYPEFACE_ID[k] for k in tf_keys]
+    mat = pd.DataFrame(0.0, index=genres, columns=tf_labels)
+    d2 = d[d["typeface_kategori"].notna() & (d["typeface_kategori"] != "unclassified")]
+    for genre in genres:
+        mask = d2["GENRES"].apply(lambda x: genre in [g.strip() for g in str(x).split(",")])
+        sub = d2[mask]
+        if len(sub) == 0: continue
+        vc = sub["typeface_kategori"].map(TYPEFACE_ID).value_counts(normalize=True)
+        for k in tf_keys:
+            mat.loc[genre, TYPEFACE_ID[k]] = vc.get(TYPEFACE_ID[k], 0.0)
+    text_mat = (mat * 100).round(0).astype(int).astype(str) + "%"
+    fig = go.Figure(data=go.Heatmap(
+        z=mat.values, x=tf_labels, y=genres,
+        colorscale="Purples",
+        text=text_mat.values, texttemplate="%{text}",
+        textfont=dict(size=9, color="#1A1A1A"),
+        hovertemplate="Genre: %{y}<br>Tipografi: %{x}<br>Proporsi: %{text}<extra></extra>",
+        showscale=True))
+    fig.update_layout(**pb(max(340, top_n*28),
+        margin=dict(l=140,r=20,t=32,b=90),
+        yaxis=dict(autorange="reversed"),
+        xaxis=dict(tickangle=-30),
+        xaxis_title="", yaxis_title=""))
+    return fig
+
+def heatmap_gaya_genre(d, top_n=12):
+    genres = _top_genres(d, top_n)
+    gaya_keys = list(GAYA_ID.keys())
+    gaya_labels = [GAYA_ID[k] for k in gaya_keys]
+    mat = pd.DataFrame(0.0, index=genres, columns=gaya_labels)
+    d2 = d[d["gaya_ilustrasi"].notna()]
+    for genre in genres:
+        mask = d2["GENRES"].apply(lambda x: genre in [g.strip() for g in str(x).split(",")])
+        sub = d2[mask]
+        if len(sub) == 0: continue
+        vc = sub["gaya_ilustrasi"].map(GAYA_ID).value_counts(normalize=True)
+        for k in gaya_keys:
+            mat.loc[genre, GAYA_ID[k]] = vc.get(GAYA_ID[k], 0.0)
+    text_mat = (mat * 100).round(0).astype(int).astype(str) + "%"
+    fig = go.Figure(data=go.Heatmap(
+        z=mat.values, x=gaya_labels, y=genres,
+        colorscale="Greens",
+        text=text_mat.values, texttemplate="%{text}",
+        textfont=dict(size=9, color="#1A1A1A"),
+        hovertemplate="Genre: %{y}<br>Gaya: %{x}<br>Proporsi: %{text}<extra></extra>",
+        showscale=True))
+    fig.update_layout(**pb(max(340, top_n*28),
+        margin=dict(l=140,r=20,t=32,b=60),
+        yaxis=dict(autorange="reversed"),
+        xaxis_title="", yaxis_title=""))
+    return fig
+
+# ── SIDEBAR ────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### Kartografi Sampul")
     st.markdown("<small>Analisis komputasional 7.453 sampul buku sastra Indonesia (2000–2025)</small>", unsafe_allow_html=True)
@@ -207,7 +310,7 @@ _gc = genre_counts(DF)
 _n_unik = len(_gc)
 
 
-# ── BERANDA ──────────────────────────────────────────────────
+# ── BERANDA ───────────────────────────────────────────────────
 if HAL == "Beranda":
     st.markdown("# Kartografi Sampul Sastra Indonesia")
     st.markdown(f"Pemetaan komputasional terhadap **{len(DF):,} sampul buku** sastra Indonesia yang terbit periode 2000–2025, dianalisis melalui tiga aspek visual sampul: warna, tipografi, dan gaya ilustrasi.")
@@ -245,6 +348,7 @@ if HAL == "Beranda":
         fig3.update_traces(marker_line_width=0)
         st.plotly_chart(fig3, use_container_width=True)
 
+
 # ── WARNA ─────────────────────────────────────────────────────
 elif HAL == "Warna":
     st.markdown("## Analisis Warna")
@@ -272,10 +376,25 @@ elif HAL == "Warna":
         fig2.update_layout(**pb(310), xaxis_title="", yaxis_title="", showlegend=True, legend=dict(orientation="h",y=-.2,font=dict(size=9)))
         st.plotly_chart(fig2, use_container_width=True)
     st.markdown("**Kecerahan vs Saturasi per Warna**")
-    fig_sc = px.scatter(DF.dropna(subset=["brightness_mean","saturation_mean","warna_kategori"]), x="brightness_mean", y="saturation_mean", color="warna_kategori", color_discrete_map=WARNA_HEX, opacity=.35, hover_data=["TITLE","AUTHOR","YEAR"])
-    fig_sc.update_layout(**pb(300), showlegend=True, legend=dict(orientation="h",y=-.18,font=dict(size=10)), xaxis_title="Kecerahan (V)", yaxis_title="Saturasi (S)")
-    fig_sc.update_traces(marker=dict(size=4))
+    fig_sc = px.scatter(DF.dropna(subset=["brightness_mean","saturation_mean","warna_kategori"]),
+        x="brightness_mean", y="saturation_mean", color="warna_kategori",
+        color_discrete_map=WARNA_HEX, opacity=.35,
+        custom_data=["TITLE","AUTHOR","YEAR","warna_kategori"])
+    fig_sc.update_traces(marker=dict(size=4),
+        hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]} · %{customdata[2]}<br>"
+                      "Warna: %{customdata[3]}<br>V: %{x:.2f} · S: %{y:.2f}<extra></extra>")
+    fig_sc.update_layout(**pb(300), showlegend=True,
+        legend=dict(orientation="h",y=-.18,font=dict(size=10)),
+        xaxis_title="Kecerahan (V)", yaxis_title="Saturasi (S)")
     st.plotly_chart(fig_sc, use_container_width=True)
+
+    # ── Peta Panas Warna × Genre ──
+    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+    st.markdown("**Peta Panas Warna × Genre**")
+    st.markdown("<small>Proporsi buku per genre yang memiliki warna dominan tersebut. Menunjukkan asosiasi warna–genre di seluruh korpus.</small>", unsafe_allow_html=True)
+    hn_w = st.slider("Jumlah genre", 6, 20, 12, 2, key="hn_warna")
+    st.plotly_chart(heatmap_warna_genre(DF, hn_w), use_container_width=True)
+
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Cari Buku berdasarkan Warna**")
     wc1,wc2,wc3 = st.columns([2,2,1])
@@ -287,6 +406,7 @@ elif HAL == "Warna":
         ql = q_w.lower(); dw = dw[dw["TITLE"].str.lower().str.contains(ql,na=False)|dw["AUTHOR"].str.lower().str.contains(ql,na=False)]
     if w_sel != "Semua": dw = dw[dw["warna_kategori"]==w_sel]
     if not dw.empty: grid(dw.head(n_w))
+
 
 # ── TIPOGRAFI ─────────────────────────────────────────────────
 elif HAL == "Tipografi":
@@ -304,26 +424,41 @@ elif HAL == "Tipografi":
     with ca3:
         st.markdown("**Distribusi Typeface**")
         tc = DF["typeface_kategori"].map(TYPEFACE_ID).value_counts()
-        fig = px.bar(x=tc.values, y=tc.index, orientation="h", color=tc.index, color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID}, text=tc.values)
-        fig.update_layout(**pb(300), showlegend=False, xaxis_title="", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+        fig = px.bar(x=tc.values, y=tc.index, orientation="h", color=tc.index,
+            color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID}, text=tc.values)
+        fig.update_layout(**pb(300), showlegend=False, xaxis_title="", yaxis_title="",
+            yaxis=dict(categoryorder="total ascending"))
         fig.update_traces(textposition="outside", marker_line_width=0)
         st.plotly_chart(fig, use_container_width=True)
     with cb3:
         st.markdown("**Tren Typeface per Tahun**")
-        dft2 = DF[(DF["YEAR"]>0)&DF["typeface_kategori"].notna()].copy(); dft2["tf"] = dft2["typeface_kategori"].map(TYPEFACE_ID)
+        dft2 = DF[(DF["YEAR"]>0)&DF["typeface_kategori"].notna()].copy()
+        dft2["tf"] = dft2["typeface_kategori"].map(TYPEFACE_ID)
         tr2 = dft2.groupby(["YEAR","tf"]).size().reset_index(name="n")
-        fig2 = px.bar(tr2, x="YEAR", y="n", color="tf", barmode="stack", color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID})
-        fig2.update_layout(**pb(300), xaxis_title="", yaxis_title="", showlegend=True, legend=dict(orientation="h",y=-.22,font=dict(size=9)))
+        fig2 = px.bar(tr2, x="YEAR", y="n", color="tf", barmode="stack",
+            color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID})
+        fig2.update_layout(**pb(300), xaxis_title="", yaxis_title="", showlegend=True,
+            legend=dict(orientation="h",y=-.22,font=dict(size=9)))
         st.plotly_chart(fig2, use_container_width=True)
     prob_cols_tf = [c for c in DF.columns if c.startswith("typeface_prob_")]
     if prob_cols_tf:
         st.markdown("**Rata-rata Probabilitas CLIP per Kategori**")
         means = DF[prob_cols_tf].mean().sort_values()
         means.index = [TYPEFACE_ID.get(c.replace("typeface_prob_",""),c) for c in means.index]
-        fp = px.bar(x=means.values, y=means.index, orientation="h", color=means.index, color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID}, text=[f"{v:.3f}" for v in means.values])
+        fp = px.bar(x=means.values, y=means.index, orientation="h", color=means.index,
+            color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID},
+            text=[f"{v:.3f}" for v in means.values])
         fp.update_layout(**pb(240), showlegend=False, xaxis_title="Rata-rata Softmax", yaxis_title="")
         fp.update_traces(textposition="outside", marker_line_width=0)
         st.plotly_chart(fp, use_container_width=True)
+
+    # ── Peta Panas Tipografi × Genre ──
+    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+    st.markdown("**Peta Panas Tipografi × Genre**")
+    st.markdown("<small>Proporsi penggunaan typeface per genre. Menunjukkan kecenderungan tipografis khas pada setiap jenis/tematik sastra.</small>", unsafe_allow_html=True)
+    hn_tf = st.slider("Jumlah genre", 6, 20, 12, 2, key="hn_tf")
+    st.plotly_chart(heatmap_tf_genre(DF, hn_tf), use_container_width=True)
+
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Contoh Buku — Kepercayaan Tertinggi per Kategori**")
     df_tv = DF[DF["typeface_kategori"].notna()&DF["image_ok"]].copy()
@@ -371,17 +506,30 @@ elif HAL == "Ilustrasi":
     with ca4:
         st.markdown("**Distribusi Gaya**")
         gc = DF["gaya_ilustrasi"].map(GAYA_ID).value_counts()
-        fig = px.bar(x=gc.values, y=gc.index, orientation="h", color=gc.index, color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID}, text=gc.values)
-        fig.update_layout(**pb(290), showlegend=False, xaxis_title="", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+        fig = px.bar(x=gc.values, y=gc.index, orientation="h", color=gc.index,
+            color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID}, text=gc.values)
+        fig.update_layout(**pb(290), showlegend=False, xaxis_title="", yaxis_title="",
+            yaxis=dict(categoryorder="total ascending"))
         fig.update_traces(textposition="outside", marker_line_width=0)
         st.plotly_chart(fig, use_container_width=True)
     with cb4:
         st.markdown("**Tren Gaya per Tahun**")
-        dfg = DF[(DF["YEAR"]>0)&DF["gaya_ilustrasi"].notna()].copy(); dfg["gaya"] = dfg["gaya_ilustrasi"].map(GAYA_ID)
+        dfg = DF[(DF["YEAR"]>0)&DF["gaya_ilustrasi"].notna()].copy()
+        dfg["gaya"] = dfg["gaya_ilustrasi"].map(GAYA_ID)
         trg = dfg.groupby(["YEAR","gaya"]).size().reset_index(name="n")
-        fig2 = px.bar(trg, x="YEAR", y="n", color="gaya", barmode="stack", color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID})
-        fig2.update_layout(**pb(290), xaxis_title="", yaxis_title="", showlegend=True, legend=dict(orientation="h",y=-.2,font=dict(size=9)))
+        fig2 = px.bar(trg, x="YEAR", y="n", color="gaya", barmode="stack",
+            color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID})
+        fig2.update_layout(**pb(290), xaxis_title="", yaxis_title="", showlegend=True,
+            legend=dict(orientation="h",y=-.2,font=dict(size=9)))
         st.plotly_chart(fig2, use_container_width=True)
+
+    # ── Peta Panas Gaya × Genre ──
+    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+    st.markdown("**Peta Panas Gaya Ilustrasi × Genre**")
+    st.markdown("<small>Proporsi gaya ilustrasi per genre. Menunjukkan konvensi visual khas setiap genre literatur Indonesia.</small>", unsafe_allow_html=True)
+    hn_gi = st.slider("Jumlah genre", 6, 20, 12, 2, key="hn_gi")
+    st.plotly_chart(heatmap_gaya_genre(DF, hn_gi), use_container_width=True)
+
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Figur Manusia vs Non-Manusia**")
     yh = int(DF["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE").sum())
@@ -391,10 +539,13 @@ elif HAL == "Ilustrasi":
     man_a,man_b,man_c = st.columns([2,1,2])
     with man_a:
         fig_man = go.Figure(data=[
-            go.Bar(name="YOLOv8n", x=["Ada manusia","Tidak ada"], y=[yh,tot-yh], marker_color=["#66BB6A","rgba(128,128,128,.15)"]),
-            go.Bar(name="DETR", x=["Ada manusia","Tidak ada"], y=[dh,tot-dh], marker_color=["#42A5F5","rgba(128,128,128,.08)"]),
+            go.Bar(name="YOLOv8n", x=["Ada manusia","Tidak ada"], y=[yh,tot-yh],
+                marker_color=["#66BB6A","rgba(128,128,128,.15)"]),
+            go.Bar(name="DETR", x=["Ada manusia","Tidak ada"], y=[dh,tot-dh],
+                marker_color=["#42A5F5","rgba(128,128,128,.08)"]),
         ])
-        fig_man.update_layout(**pb(240), barmode="group", showlegend=True, legend=dict(orientation="h",y=-.15), xaxis_title="", yaxis_title="")
+        fig_man.update_layout(**pb(240), barmode="group", showlegend=True,
+            legend=dict(orientation="h",y=-.15), xaxis_title="", yaxis_title="")
         st.plotly_chart(fig_man, use_container_width=True)
     with man_b:
         st.metric("Sepakat keduanya", f"{agree:,}", f"{agree/tot*100:.1f}%")
@@ -411,8 +562,10 @@ elif HAL == "Ilustrasi":
                     if o and o not in ("person","0"): obj_ctr[o] += 1
         if obj_ctr:
             top_obj = pd.DataFrame(obj_ctr.most_common(12), columns=["Objek","Jumlah"])
-            fig_obj = px.bar(top_obj, x="Jumlah", y="Objek", orientation="h", color_discrete_sequence=["#00ACC1"], text="Jumlah")
-            fig_obj.update_layout(**pb(300), showlegend=False, xaxis_title="", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+            fig_obj = px.bar(top_obj, x="Jumlah", y="Objek", orientation="h",
+                color_discrete_sequence=["#00ACC1"], text="Jumlah")
+            fig_obj.update_layout(**pb(300), showlegend=False, xaxis_title="", yaxis_title="",
+                yaxis=dict(categoryorder="total ascending"))
             fig_obj.update_traces(textposition="outside", marker_line_width=0)
             st.plotly_chart(fig_obj, use_container_width=True)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
@@ -457,34 +610,56 @@ elif HAL == "Genre":
     gc_all = _gc
     jenis_items   = [(g,n) for g,n in gc_all.most_common() if g in JENIS_KARYA]
     tematik_items = [(g,n) for g,n in gc_all.most_common() if g not in JENIS_KARYA and n >= 3]
+    all_genre_items = [(g,n) for g,n in gc_all.most_common() if n >= 3]
+
     cgl,cgr = st.columns(2)
     with cgl:
         st.markdown("**Jenis Karya**")
         df_jk = pd.DataFrame(jenis_items, columns=["Jenis","Jumlah"])
-        fig_jk = px.bar(df_jk, x="Jumlah", y="Jenis", orientation="h", color_discrete_sequence=["#1E88E5"], text="Jumlah")
-        fig_jk.update_layout(**pb(max(240,len(jenis_items)*36)), showlegend=False, xaxis_title="", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+        fig_jk = px.bar(df_jk, x="Jumlah", y="Jenis", orientation="h",
+            color_discrete_sequence=["#1E88E5"], text="Jumlah")
+        fig_jk.update_layout(**pb(max(240,len(jenis_items)*36)), showlegend=False,
+            xaxis_title="", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
         fig_jk.update_traces(textposition="outside", marker_line_width=0)
         st.plotly_chart(fig_jk, use_container_width=True)
     with cgr:
         st.markdown(f"**Genre Tematik** ({len(tematik_items)} genre)")
-        n_top = st.slider("Tampilkan top N genre tematik", 5, min(len(tematik_items),60), min(20,len(tematik_items)), 5, key="gn_top")
+        n_top = st.slider("Tampilkan top N genre tematik", 5, min(len(tematik_items),60),
+            min(20,len(tematik_items)), 5, key="gn_top")
         df_tm = pd.DataFrame(tematik_items[:n_top], columns=["Genre","Jumlah"])
-        fig_tm = px.bar(df_tm, x="Jumlah", y="Genre", orientation="h", color_discrete_sequence=["#FB8C00"], text="Jumlah")
-        fig_tm.update_layout(**pb(max(280,n_top*24)), showlegend=False, xaxis_title="", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+        fig_tm = px.bar(df_tm, x="Jumlah", y="Genre", orientation="h",
+            color_discrete_sequence=["#FB8C00"], text="Jumlah")
+        fig_tm.update_layout(**pb(max(280,n_top*24)), showlegend=False,
+            xaxis_title="", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
         fig_tm.update_traces(textposition="outside", marker_line_width=0)
         st.plotly_chart(fig_tm, use_container_width=True)
+
+    # ── Peta Panas Tumpang Tindih — SEMUA genre ──
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-    st.markdown("**Peta Panas Tumpang Tindih Genre Tematik (Top 12)**")
-    top12t = [g for g,_ in tematik_items[:12]]
-    co = pd.DataFrame(0, index=top12t, columns=top12t)
+    st.markdown("**Peta Panas Tumpang Tindih Genre**")
+    st.markdown("<small>Co-occurrence antar genre (jenis karya + tematik). Diagonal = jumlah buku per genre.</small>", unsafe_allow_html=True)
+    n_co = st.slider("Jumlah genre teratas", 8, min(len(all_genre_items), 30), 16, 2, key="n_co")
+    top_co = [g for g,_ in all_genre_items[:n_co]]
+    co = pd.DataFrame(0, index=top_co, columns=top_co)
     for gl in expand_genres(DF["GENRES"]):
-        rel = [g for g in gl if g in top12t]
+        rel = [g for g in gl if g in top_co]
         for i,g1 in enumerate(rel):
             for g2 in rel[i+1:]: co.loc[g1,g2]+=1; co.loc[g2,g1]+=1
-    fig_co = px.imshow(co, color_continuous_scale="Oranges", aspect="auto", text_auto=True)
-    fig_co.update_layout(**pb(400), xaxis_title="", yaxis_title="", coloraxis_showscale=False)
-    fig_co.update_traces(textfont_size=10)
+    for g in top_co: co.loc[g,g] = gc_all[g]
+    fig_co = go.Figure(data=go.Heatmap(
+        z=co.values, x=top_co, y=top_co,
+        colorscale="Oranges",
+        text=co.values.astype(int).astype(str),
+        texttemplate="%{text}", textfont=dict(size=9, color="#1A1A1A"),
+        hovertemplate="Genre A: %{y}<br>Genre B: %{x}<br>Co-occurrence: %{z}<extra></extra>",
+        showscale=True))
+    fig_co.update_layout(**pb(max(420, n_co*28),
+        margin=dict(l=130,r=20,t=32,b=130),
+        xaxis=dict(tickangle=-40),
+        yaxis=dict(autorange="reversed"),
+        xaxis_title="", yaxis_title=""))
     st.plotly_chart(fig_co, use_container_width=True)
+
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Analisis per Genre**")
     st.markdown("<small>Klik genre untuk melihat analisis warna, tipografi, dan ilustrasi beserta contoh sampul representatif.</small>", unsafe_allow_html=True)
@@ -516,15 +691,20 @@ elif HAL == "Genre":
                 wc_g = df_gs["warna_kategori"].value_counts(); wc_all = DF["warna_kategori"].value_counts()
                 cw1,cw2 = st.columns(2)
                 with cw1:
-                    fig_wg = px.bar(x=wc_g.values, y=wc_g.index, orientation="h", color=wc_g.index, color_discrete_map=WARNA_HEX, text=wc_g.values)
-                    fig_wg.update_layout(**pb(260), showlegend=False, xaxis_title="Jumlah", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+                    fig_wg = px.bar(x=wc_g.values, y=wc_g.index, orientation="h",
+                        color=wc_g.index, color_discrete_map=WARNA_HEX, text=wc_g.values)
+                    fig_wg.update_layout(**pb(260), showlegend=False, xaxis_title="Jumlah",
+                        yaxis_title="", yaxis=dict(categoryorder="total ascending"))
                     fig_wg.update_traces(textposition="outside", marker_line_width=0)
                     st.plotly_chart(fig_wg, use_container_width=True)
                 with cw2:
                     diff = (wc_g/len(df_gs)-wc_all/len(DF)).dropna().sort_values(ascending=False)
                     diff_df = diff.reset_index(); diff_df.columns = ["warna","delta"]
-                    fig_diff = px.bar(diff_df, x="delta", y="warna", orientation="h", color="warna", color_discrete_map=WARNA_HEX)
-                    fig_diff.update_layout(**pb(260), showlegend=False, xaxis_title="Simpangan proporsi", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+                    fig_diff = px.bar(diff_df, x="delta", y="warna", orientation="h",
+                        color="warna", color_discrete_map=WARNA_HEX)
+                    fig_diff.update_layout(**pb(260), showlegend=False,
+                        xaxis_title="Simpangan proporsi", yaxis_title="",
+                        yaxis=dict(categoryorder="total ascending"))
                     fig_diff.add_vline(x=0, line_dash="dash", line_color="rgba(128,128,128,.4)")
                     st.plotly_chart(fig_diff, use_container_width=True)
                 st.markdown("**Contoh sampul per warna dominan**")
@@ -546,15 +726,23 @@ elif HAL == "Genre":
                     tc_all = DF[DF["typeface_kategori"].notna()]["typeface_kategori"].map(TYPEFACE_ID).value_counts()
                     ctf1,ctf2 = st.columns(2)
                     with ctf1:
-                        fig_tg = px.bar(x=tc_g.values, y=tc_g.index, orientation="h", color=tc_g.index, color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID}, text=tc_g.values)
-                        fig_tg.update_layout(**pb(250), showlegend=False, xaxis_title="Jumlah", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+                        fig_tg = px.bar(x=tc_g.values, y=tc_g.index, orientation="h",
+                            color=tc_g.index,
+                            color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID},
+                            text=tc_g.values)
+                        fig_tg.update_layout(**pb(250), showlegend=False, xaxis_title="Jumlah",
+                            yaxis_title="", yaxis=dict(categoryorder="total ascending"))
                         fig_tg.update_traces(textposition="outside", marker_line_width=0)
                         st.plotly_chart(fig_tg, use_container_width=True)
                     with ctf2:
                         diff_tf = (tc_g/len(df_gs_tf)-tc_all/len(DF[DF["typeface_kategori"].notna()])).dropna().sort_values(ascending=False)
                         diff_tf_df = diff_tf.reset_index(); diff_tf_df.columns = ["tipografi","delta"]
-                        fig_dtf = px.bar(diff_tf_df, x="delta", y="tipografi", orientation="h", color="tipografi", color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID})
-                        fig_dtf.update_layout(**pb(250), showlegend=False, xaxis_title="Simpangan proporsi", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+                        fig_dtf = px.bar(diff_tf_df, x="delta", y="tipografi", orientation="h",
+                            color="tipografi",
+                            color_discrete_map={TYPEFACE_ID[k]:TYPEFACE_CLR[k] for k in TYPEFACE_ID})
+                        fig_dtf.update_layout(**pb(250), showlegend=False,
+                            xaxis_title="Simpangan proporsi", yaxis_title="",
+                            yaxis=dict(categoryorder="total ascending"))
                         fig_dtf.add_vline(x=0, line_dash="dash", line_color="rgba(128,128,128,.4)")
                         st.plotly_chart(fig_dtf, use_container_width=True)
                     st.markdown("**Contoh sampul per tipografi**")
@@ -576,15 +764,23 @@ elif HAL == "Genre":
                 gc_g = df_gs["gaya_ilustrasi"].map(GAYA_ID).value_counts(); gc_all_d = DF["gaya_ilustrasi"].map(GAYA_ID).value_counts()
                 cg1,cg2 = st.columns(2)
                 with cg1:
-                    fig_gg = px.bar(x=gc_g.values, y=gc_g.index, orientation="h", color=gc_g.index, color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID}, text=gc_g.values)
-                    fig_gg.update_layout(**pb(250), showlegend=False, xaxis_title="Jumlah", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+                    fig_gg = px.bar(x=gc_g.values, y=gc_g.index, orientation="h",
+                        color=gc_g.index,
+                        color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID},
+                        text=gc_g.values)
+                    fig_gg.update_layout(**pb(250), showlegend=False, xaxis_title="Jumlah",
+                        yaxis_title="", yaxis=dict(categoryorder="total ascending"))
                     fig_gg.update_traces(textposition="outside", marker_line_width=0)
                     st.plotly_chart(fig_gg, use_container_width=True)
                 with cg2:
                     diff_gi = (gc_g/len(df_gs)-gc_all_d/len(DF)).dropna().sort_values(ascending=False)
                     diff_gi_df = diff_gi.reset_index(); diff_gi_df.columns = ["gaya","delta"]
-                    fig_dgi = px.bar(diff_gi_df, x="delta", y="gaya", orientation="h", color="gaya", color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID})
-                    fig_dgi.update_layout(**pb(250), showlegend=False, xaxis_title="Simpangan proporsi", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+                    fig_dgi = px.bar(diff_gi_df, x="delta", y="gaya", orientation="h",
+                        color="gaya",
+                        color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID})
+                    fig_dgi.update_layout(**pb(250), showlegend=False,
+                        xaxis_title="Simpangan proporsi", yaxis_title="",
+                        yaxis=dict(categoryorder="total ascending"))
                     fig_dgi.add_vline(x=0, line_dash="dash", line_color="rgba(128,128,128,.4)")
                     st.plotly_chart(fig_dgi, use_container_width=True)
                 st.markdown("**Contoh sampul per gaya ilustrasi**")
@@ -615,8 +811,16 @@ elif HAL == "Illustrator":
         ql = q_ill.lower()
         df_ill = df_ill[df_ill["ILLUSTRATOR"].str.lower().str.contains(ql,na=False)|df_ill["TITLE"].str.lower().str.contains(ql,na=False)]
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-    ill_sum = (df_ill.groupby("ILLUSTRATOR").agg(Buku=("TITLE","count"),Judul=("TITLE",lambda x: " · ".join(x.values.tolist())),Tahun=("YEAR",lambda x: ", ".join(sorted({str(int(v)) for v in x if v>0})))).reset_index().sort_values("Buku",ascending=False).rename(columns={"ILLUSTRATOR":"Illustrator"}))
-    st.dataframe(ill_sum, use_container_width=True, hide_index=True, column_config={"Illustrator":st.column_config.TextColumn(width="medium"),"Buku":st.column_config.NumberColumn(width="small"),"Judul":st.column_config.TextColumn(width="large"),"Tahun":st.column_config.TextColumn(width="small")})
+    ill_sum = (df_ill.groupby("ILLUSTRATOR").agg(
+        Buku=("TITLE","count"),
+        Judul=("TITLE",lambda x: " · ".join(x.values.tolist())),
+        Tahun=("YEAR",lambda x: ", ".join(sorted({str(int(v)) for v in x if v>0})))
+    ).reset_index().sort_values("Buku",ascending=False).rename(columns={"ILLUSTRATOR":"Illustrator"}))
+    st.dataframe(ill_sum, use_container_width=True, hide_index=True,
+        column_config={"Illustrator":st.column_config.TextColumn(width="medium"),
+                       "Buku":st.column_config.NumberColumn(width="small"),
+                       "Judul":st.column_config.TextColumn(width="large"),
+                       "Tahun":st.column_config.TextColumn(width="small")})
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("### Perbandingan Sampul: Dengan vs Tanpa Illustrator")
     st.markdown("Apakah sampul yang disebutkan nama illustratornya cenderung berbeda secara visual dari yang tidak?")
@@ -625,7 +829,8 @@ elif HAL == "Illustrator":
         for c in ["brightness_mean","saturation_mean","gaya_skor","typeface_skor"]:
             if c in d.columns: d[c] = pd.to_numeric(d[c], errors="coerce")
     met_cols = st.columns(4)
-    for mcol,(lbl,col) in zip(met_cols,[("Kecerahan","brightness_mean"),("Saturasi","saturation_mean"),("Skor Gaya","gaya_skor"),("Skor Tipografi","typeface_skor")]):
+    for mcol,(lbl,col) in zip(met_cols,[("Kecerahan","brightness_mean"),("Saturasi","saturation_mean"),
+                                         ("Skor Gaya","gaya_skor"),("Skor Tipografi","typeface_skor")]):
         v_w = df_with[col].mean() if col in df_with.columns else 0
         v_o = df_wout[col].mean() if col in df_wout.columns else 0
         mcol.metric(f"{lbl} (dengan ill.)", f"{v_w:.3f}", f"{v_w-v_o:+.3f} vs tanpa")
@@ -633,37 +838,51 @@ elif HAL == "Illustrator":
     wc_w = df_with["warna_kategori"].value_counts(normalize=True)
     wc_o = df_wout["warna_kategori"].value_counts(normalize=True)
     all_w = sorted(set(wc_w.index)|set(wc_o.index))
-    warna_cmp = pd.DataFrame({"Dengan Illustrator":[wc_w.get(w,0) for w in all_w],"Tanpa Illustrator":[wc_o.get(w,0) for w in all_w]}, index=all_w)
+    warna_cmp = pd.DataFrame({
+        "Dengan Illustrator":[wc_w.get(w,0) for w in all_w],
+        "Tanpa Illustrator":[wc_o.get(w,0) for w in all_w]}, index=all_w)
     fig_wc = go.Figure()
-    fig_wc.add_trace(go.Bar(name="Dengan Illustrator", x=warna_cmp.index, y=warna_cmp["Dengan Illustrator"], marker_color=[WARNA_HEX.get(w,"#999") for w in all_w], opacity=.9))
-    fig_wc.add_trace(go.Bar(name="Tanpa Illustrator", x=warna_cmp.index, y=warna_cmp["Tanpa Illustrator"], marker_color=[WARNA_HEX.get(w,"#999") for w in all_w], opacity=.35))
-    fig_wc.update_layout(**pb(280), barmode="group", showlegend=True, xaxis_title="", yaxis_title="Proporsi", legend=dict(orientation="h",y=-.15))
+    fig_wc.add_trace(go.Bar(name="Dengan Illustrator", x=warna_cmp.index,
+        y=warna_cmp["Dengan Illustrator"],
+        marker_color=[WARNA_HEX.get(w,"#999") for w in all_w], opacity=.9))
+    fig_wc.add_trace(go.Bar(name="Tanpa Illustrator", x=warna_cmp.index,
+        y=warna_cmp["Tanpa Illustrator"],
+        marker_color=[WARNA_HEX.get(w,"#999") for w in all_w], opacity=.35))
+    fig_wc.update_layout(**pb(280), barmode="group", showlegend=True,
+        xaxis_title="", yaxis_title="Proporsi", legend=dict(orientation="h",y=-.15))
     st.plotly_chart(fig_wc, use_container_width=True)
     il2a,il2b = st.columns(2)
     with il2a:
         st.markdown("**Gaya Ilustrasi — Dengan Illustrator**")
         gc_w = df_with["gaya_ilustrasi"].map(GAYA_ID).value_counts()
-        fig_gw = px.pie(values=gc_w.values, names=gc_w.index, hole=.5, color=gc_w.index, color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID})
-        fig_gw.update_layout(**pb(240), showlegend=True, legend=dict(orientation="h",y=-.1,font=dict(size=10)))
+        fig_gw = px.pie(values=gc_w.values, names=gc_w.index, hole=.5, color=gc_w.index,
+            color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID})
+        fig_gw.update_layout(**pb(240), showlegend=True,
+            legend=dict(orientation="h",y=-.1,font=dict(size=10)))
         fig_gw.update_traces(textinfo="percent", textfont_size=10)
         st.plotly_chart(fig_gw, use_container_width=True)
     with il2b:
         st.markdown("**Gaya Ilustrasi — Tanpa Illustrator**")
         gc_o = df_wout["gaya_ilustrasi"].map(GAYA_ID).value_counts()
-        fig_go = px.pie(values=gc_o.values, names=gc_o.index, hole=.5, color=gc_o.index, color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID})
-        fig_go.update_layout(**pb(240), showlegend=True, legend=dict(orientation="h",y=-.1,font=dict(size=10)))
+        fig_go = px.pie(values=gc_o.values, names=gc_o.index, hole=.5, color=gc_o.index,
+            color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID})
+        fig_go.update_layout(**pb(240), showlegend=True,
+            legend=dict(orientation="h",y=-.1,font=dict(size=10)))
         fig_go.update_traces(textinfo="percent", textfont_size=10)
         st.plotly_chart(fig_go, use_container_width=True)
     st.markdown("**Simpangan Gaya: Dengan − Tanpa Illustrator**")
     diff_gaya = (gc_w/n_ill - gc_o/n_no_ill).dropna().sort_values(ascending=False)
     diff_gaya_df = diff_gaya.reset_index(); diff_gaya_df.columns = ["gaya","delta"]
-    fig_dg = px.bar(diff_gaya_df, x="delta", y="gaya", orientation="h", color="gaya", color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID})
-    fig_dg.update_layout(**pb(240), showlegend=False, xaxis_title="Selisih proporsi", yaxis_title="", yaxis=dict(categoryorder="total ascending"))
+    fig_dg = px.bar(diff_gaya_df, x="delta", y="gaya", orientation="h",
+        color="gaya", color_discrete_map={GAYA_ID[k]:GAYA_CLR[k] for k in GAYA_ID})
+    fig_dg.update_layout(**pb(240), showlegend=False, xaxis_title="Selisih proporsi",
+        yaxis_title="", yaxis=dict(categoryorder="total ascending"))
     fig_dg.add_vline(x=0, line_dash="dash", line_color="rgba(128,128,128,.4)")
     st.plotly_chart(fig_dg, use_container_width=True)
     st.markdown("<small style='opacity:.55'>Nilai positif berarti gaya tersebut lebih sering ditemukan pada buku yang menyebutkan nama illustratornya.</small>", unsafe_allow_html=True)
 
-# ── JELAJAH BUKU ─────────────────────────────────────────────
+
+# ── JELAJAH BUKU ──────────────────────────────────────────────
 elif HAL == "Jelajah Buku":
     st.markdown("## Jelajah Buku")
     st.markdown("Temukan buku dari kombinasi kriteria visual dan metadata.")
