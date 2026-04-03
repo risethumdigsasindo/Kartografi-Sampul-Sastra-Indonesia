@@ -84,8 +84,15 @@ def load_data(path):
     d["image_ok"] = d["image_ok"].astype(str).str.upper().isin(["TRUE","1"])
     d["ILLUSTRATOR"] = d["ILLUSTRATOR"].fillna("").astype(str).str.strip()
     d.loc[d["ILLUSTRATOR"].isin(["nan","NaN","None"]), "ILLUSTRATOR"] = ""
+    if "typeface_kategori" in d.columns:
+    d["typeface_kategori"] = d["typeface_kategori"].fillna("unclassified")
+
+    valid_tf = set(TYPEFACE_ID.keys()) | {"unclassified"}
+
     d["typeface_kategori"] = d["typeface_kategori"].where(
-        d["typeface_kategori"].astype(str).str.strip().isin(set(TYPEFACE_ID.keys())), other=pd.NA)
+        d["typeface_kategori"].astype(str).str.strip().isin(valid_tf),
+        other="unclassified"
+    )
     d["gaya_ilustrasi"] = d["gaya_ilustrasi"].where(
         d["gaya_ilustrasi"].astype(str).str.strip().isin(set(GAYA_ID.keys())), other=pd.NA)
     return d
@@ -206,7 +213,7 @@ if HAL == "Beranda":
     c1,c2,c3,c4 = st.columns(4)
     for col,(lbl,val,sub,clr) in zip([c1,c2,c3,c4],[
         ("Warna",DF["warna_kategori"].notna().sum(),"sampul dianalisis","#1E88E5"),
-        ("Tipografi",DF["typeface_kategori"].notna().sum(),"sampul terklasifikasi","#8E24AA"),
+        ("Tipografi",len(DF),"sampul dianalisis","#8E24AA"),
         ("Ilustrasi",DF["gaya_ilustrasi"].notna().sum(),"sampul terklasifikasi","#43A047"),
         ("Genre",_n_unik,"genre unik teridentifikasi","#FB8C00"),
     ]):
