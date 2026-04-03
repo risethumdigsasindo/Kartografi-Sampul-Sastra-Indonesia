@@ -85,7 +85,7 @@ def load_data(path):
     d["ILLUSTRATOR"] = d["ILLUSTRATOR"].fillna("").astype(str).str.strip()
     d.loc[d["ILLUSTRATOR"].isin(["nan","NaN","None"]), "ILLUSTRATOR"] = ""
     if "typeface_kategori" in d.columns:
-    d["typeface_kategori"] = d["typeface_kategori"].fillna("unclassified")
+        d["typeface_kategori"] = d["typeface_kategori"].fillna("unclassified")
 
     valid_tf = set(TYPEFACE_ID.keys()) | {"unclassified"}
 
@@ -93,6 +93,7 @@ def load_data(path):
         d["typeface_kategori"].astype(str).str.strip().isin(valid_tf),
         other="unclassified"
     )
+    
     d["gaya_ilustrasi"] = d["gaya_ilustrasi"].where(
         d["gaya_ilustrasi"].astype(str).str.strip().isin(set(GAYA_ID.keys())), other=pd.NA)
     return d
