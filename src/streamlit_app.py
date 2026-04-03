@@ -209,7 +209,7 @@ _n_unik = len(_gc)
 # ── BERANDA ──────────────────────────────────────────────────
 if HAL == "Beranda":
     st.markdown("# Kartografi Sampul Sastra Indonesia")
-    st.markdown(f"Pemetaan komputasional terhadap **{len(DF):,} sampul buku** sastra Indonesia yang terbit antara 2000–2025, dianalisis melalui tiga modul: warna, tipografi, dan gaya ilustrasi.")
+    st.markdown(f"Pemetaan komputasional terhadap **{len(DF):,} sampul buku** sastra Indonesia yang terbit periode 2000–2025, dianalisis melalui tiga aspek visual sampul: warna, tipografi, dan gaya ilustrasi.")
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     c1,c2,c3,c4 = st.columns(4)
     for col,(lbl,val,sub,clr) in zip([c1,c2,c3,c4],[
