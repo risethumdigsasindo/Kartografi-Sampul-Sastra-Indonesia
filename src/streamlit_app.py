@@ -220,7 +220,6 @@ if HAL == "Beranda":
     ]):
         with col:
             st.markdown(f'<div class="stat-card" style="border-top:3px solid {clr};"><div class="lbl">{lbl}</div><div class="val" style="color:{clr};">{int(val):,}</div><div class="sub">{sub}</div></div>', unsafe_allow_html=True)
-    st.markdown("<small style='opacity:.45'>Warna dan Ilustrasi lengkap 7.453 buku. Tipografi 5.788 buku — 1.665 dalam antrian re-analisis.</small>", unsafe_allow_html=True)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     ca,cb,cc = st.columns(3)
     with ca:
