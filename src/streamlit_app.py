@@ -342,7 +342,7 @@ if HAL == "Beranda":
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
     n_warna = int(DF["warna_kategori"].notna().sum())
-    n_tf    = int(DF[DF["typeface_kategori"] = DF["typeface_kategori"].fillna("unclassified")].shape[0])
+    n_tf    = int(DF[DF["typeface_kategori"] == DF["typeface_kategori"].fillna("unclassified")].shape[0])
     n_gi    = int(DF["gaya_ilustrasi"].notna().sum())
 
     c1,c2,c3,c4,c5,c6 = st.columns(6)
