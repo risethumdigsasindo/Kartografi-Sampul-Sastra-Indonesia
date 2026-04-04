@@ -550,8 +550,7 @@ def heatmap_gaya_genre(d, top_n=12):
 with st.sidebar:
     st.markdown("### Kartografi Sampul")
     st.markdown(
-        "<small>Analisis komputasional sampul buku sastra Indonesia "
-        "(Fiksi & Puisi, 2000–2025)</small>",
+        "<small>Analisis komputasional sampul buku sastra Indonesia ",
         unsafe_allow_html=True
     )
     st.markdown("---")
@@ -627,9 +626,6 @@ if HAL == "Beranda":
 
     # Tren terbit per tahun
     st.markdown("**Tren Terbit per Tahun**")
-    # Tren terbit per tahun (tanpa kategori)
-    st.markdown("**Tren Terbit per Tahun**")
-
     yr = (
         DF[DF["YEAR"] > 0]
         .groupby("YEAR")
