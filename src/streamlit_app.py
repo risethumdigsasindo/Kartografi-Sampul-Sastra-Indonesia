@@ -153,7 +153,10 @@ GENRE_NORM = {
 GENRE_EXCLUDE = {"Sastra Indonesia", "Sastra", "Fiksi"}
 
 # ── PATH ─────────────────────────────────────────────────────────────────────
-DATA_PATH  = os.path.join(os.path.dirname(__file__), "data.csv")
+# Gunakan data_final_v2.csv jika tersedia (tipografi lengkap), fallback ke data.csv
+_v2_path = os.path.join(os.path.dirname(__file__), "data_final_v2.csv")
+_v1_path = os.path.join(os.path.dirname(__file__), "data.csv")
+DATA_PATH  = _v2_path if os.path.exists(_v2_path) else _v1_path
 COVER_DIR  = os.path.join(os.path.dirname(__file__), "..", "covers")
 
 
@@ -230,9 +233,9 @@ def load_data(path):
     d["ILLUSTRATOR"] = d["ILLUSTRATOR"].fillna("").astype(str).str.strip()
     d.loc[d["ILLUSTRATOR"].isin(["nan","NaN","None"]), "ILLUSTRATOR"] = ""
 
-    # ── FIX typeface_kategori ─────────────────────────────────────────────
-    # 236 baris error "name 'analyze_typography' is not defined"
-    # → tandai sebagai NaN / unclassified agar konsisten dengan warna & gaya
+    # ── Normalisasi typeface_kategori ──────────────────────────────────────
+    # Jika masih ada nilai tidak valid (None, nan, dsb) → unclassified
+    # Pada data_final_v2.csv (setelah re-analisis 236 buku) ini seharusnya minimal
     if "typeface_kategori" in d.columns:
         d["typeface_kategori"] = d["typeface_kategori"].fillna("unclassified")
         valid_tf = set(TYPEFACE_ID.keys()) | {"unclassified"}
@@ -607,14 +610,19 @@ if HAL == "Beranda":
 
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
-    # Catatan tipografi
-    n_tf_error = int((df["error_modul_b"] == "name 'analyze_typography' is not defined").sum()) if "error_modul_b" in df.columns else 0
-    if n_tf_error > 0:
+    # Status kelengkapan data
+    n_tf_error = int((df["error_modul_b"].astype(str).str.strip() == "name 'analyze_typography' is not defined").sum()) if "error_modul_b" in df.columns else 0
+    is_v2 = os.path.exists(os.path.join(os.path.dirname(__file__), "data_final_v2.csv"))
+    if is_v2 and n_tf_error == 0:
+        st.success(
+            "✅ **Data tipografi lengkap** — semua 5.069 sampul berhasil teranalisis tipografinya "
+            "(236 buku yang sebelumnya error sudah diperbaiki via notebook re-analisis)."
+        )
+    elif n_tf_error > 0:
         st.info(
-            f"ℹ️ **Catatan tipografi:** {n_tf_error} sampul tidak teranalisis tipografinya "
-            f"karena error pada pipeline ekstraksi (`analyze_typography` tidak terdefinisi "
-            f"saat proses berjalan). Analisis warna dan gaya ilustrasi tidak terpengaruh "
-            f"karena menggunakan modul yang berbeda."
+            f"ℹ️ **Catatan tipografi:** {n_tf_error} sampul belum teranalisis tipografinya. "
+            f"Jalankan notebook `reanalisis_typeface_236.ipynb` untuk memperbaikinya — "
+            f"hasilnya akan tersimpan sebagai `data_final_v2.csv` dan otomatis digunakan app ini."
         )
 
     # Tren terbit per tahun
@@ -862,6 +870,8 @@ elif HAL == "Tipografi":
     st.markdown("## Analisis Tipografi")
 
     with st.expander("Cara kerja analisis tipografi", expanded=False):
+        is_v2_tip = os.path.exists(os.path.join(os.path.dirname(__file__), "data_final_v2.csv"))
+        n_err_tip = int((df["error_modul_b"].astype(str).str.strip() == "name 'analyze_typography' is not defined").sum()) if "error_modul_b" in df.columns else 0
         st.markdown(
             "**MSER + CLIP ViT-B/32 zero-shot (Lupton 2024, hal. 54–57)**\n\n"
             "1. **MSER** mendeteksi blob stabil khas huruf (delta=5, min_area=30). "
@@ -869,11 +879,15 @@ elif HAL == "Tipografi":
             "2. **CLIP ViT-B/32** mengukur kemiripan dengan 7 deskripsi teks kategori typeface "
             "berdasarkan anatomi visual Lupton 2024.\n"
             "3. Softmax → probabilitas per kategori.\n\n"
-            "**Akurasi ~68% top-1** (150 sampel). Script/Display paling presisi (>80%).\n\n"
-            "⚠️ **236 sampul tidak teranalisis** karena error pipeline "
-            "(`analyze_typography` tidak terdefinisi saat batch berjalan). "
-            "Sampul-sampul ini ditandai `unclassified` dan dikecualikan dari visualisasi. "
-            "Analisis warna & gaya ilustrasi tidak terpengaruh karena berjalan di modul terpisah."
+            "**Akurasi ~68% top-1** (150 sampel). Script/Display paling presisi (>80%)."
+            + (
+                "\n\n✅ **Data lengkap** — semua 5.069 buku terklasifikasi "
+                "(236 buku yang sebelumnya error sudah diperbaiki via `reanalisis_typeface_236.ipynb`)."
+                if is_v2_tip and n_err_tip == 0 else
+                f"\n\n⚠️ **{n_err_tip} sampul belum teranalisis.** "
+                "Jalankan `reanalisis_typeface_236.ipynb` di Google Colab, "
+                "lalu simpan hasilnya sebagai `data_final_v2.csv` di folder yang sama dengan `app_v2.py`."
+            )
         )
 
     st.markdown("**Tujuh Kategori Typeface (Lupton 2024, hal. 54–57)**")
