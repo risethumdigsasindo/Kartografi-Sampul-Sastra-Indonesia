@@ -550,7 +550,8 @@ def heatmap_gaya_genre(d, top_n=12):
 with st.sidebar:
     st.markdown("### Kartografi Sampul")
     st.markdown(
-        "<small>Analisis komputasional sampul buku sastra Indonesia",
+        "<small>Analisis komputasional sampul buku sastra Indonesia "
+        "(Fiksi & Puisi, 2000–2025)</small>",
         unsafe_allow_html=True
     )
     st.markdown("---")
@@ -626,22 +627,28 @@ if HAL == "Beranda":
 
     # Tren terbit per tahun
     st.markdown("**Tren Terbit per Tahun**")
-    yr_shelf = DF[DF["YEAR"] > 0].groupby(["YEAR","SHELF"]).size().reset_index(name="n")
-    yr_shelf["Rak"] = yr_shelf["SHELF"].map(SHELF_LABEL)
+    yr = DF[DF["YEAR"] > 0].groupby("YEAR").size().reset_index(name="n")
     fig_yr = px.bar(
-        yr_shelf, x="YEAR", y="n", color="Rak",
-        barmode="stack"
+        yr,
+        x="YEAR",
+        y="n"
     )
-    fig_yr.update_layout(**pb(280), xaxis_title="", yaxis_title="",
-                         showlegend=True,
-                         legend=dict(orientation="h",y=-.15,font=dict(size=10)))
-    fig_yr.update_traces(marker_line_width=0)
-    st.plotly_chart(fig_yr, use_container_width=True)
+    fig_yr.update_layout(
+        **pb(280),
+        xaxis_title="",
+        yaxis_title="",
+        showlegend=False
+    )
+
+fig_yr.update_traces(marker_line_width=0)
 
     # Distribusi Genre
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Distribusi Genre**")
     st.markdown(
+        "<small>Genre dinormalisasi: Sastra → Sastra Indonesia · "
+        "Cinta/Roman/Romansa Kontemporer/Kontemporer → Romansa · "
+        "Thriller/Misteri/Misteri Thriller → Thriller/Misteri · Humor → Komedi.</small>",
         unsafe_allow_html=True
     )
     gc_beranda = [(g,n) for g,n in _gc.most_common() if g not in GENRE_EXCLUDE and n >= 5]
