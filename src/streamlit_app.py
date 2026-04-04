@@ -341,10 +341,8 @@ if HAL == "Beranda":
         f"yang terbit periode 2000–2025, dianalisis melalui tiga aspek visual: warna, tipografi, dan gaya ilustrasi.")
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
-    n_fiksi = int((DF["SHELF"]=="fiksi").sum())
-    n_puisi = int((DF["SHELF"]=="puisi-asli").sum())
     n_warna = int(DF["warna_kategori"].notna().sum())
-    n_tf    = int(DF[DF["typeface_kategori"].notna()&(DF["typeface_kategori"]!="unclassified")].shape[0])
+    n_tf    = int(DF[DF["typeface_kategori"] = DF["typeface_kategori"].fillna("unclassified")].shape[0])
     n_gi    = int(DF["gaya_ilustrasi"].notna().sum())
 
     c1,c2,c3,c4,c5,c6 = st.columns(6)
