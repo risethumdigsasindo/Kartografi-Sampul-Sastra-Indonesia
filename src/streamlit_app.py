@@ -345,7 +345,7 @@ if HAL == "Beranda":
     n_tf    = int(DF[DF["typeface_kategori"].notna()&(DF["typeface_kategori"]!="unclassified")].shape[0])
     n_gi    = int(DF["gaya_ilustrasi"].notna().sum())
 
-    c1,c2,c3,c4 = st.columns(6)
+    c1,c2,c3,c4 = st.columns(4)
     for col,(lbl,val,sub,clr) in zip([c1,c2,c3,c4],[
         ("Warna",     n_warna,  "teranalisis","#FB8C00"),
         ("Tipografi", n_tf,     "teranalisis","#8E24AA"),
