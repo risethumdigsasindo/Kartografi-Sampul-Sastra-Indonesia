@@ -337,27 +337,15 @@ _n_unik = len([g for g in _gc if g not in GENRE_EXCLUDE])
 if HAL == "Beranda":
     st.markdown("# Kartografi Sampul Sastra Indonesia")
     st.markdown(
-        f"Pemetaan komputasional terhadap **{len(DF):,} sampul buku** sastra Indonesia "
-        "yang terbit antara 2000–2025, dianalisis melalui tiga modul: "
-        "warna, tipografi, dan gaya ilustrasi.")
+        f"Pemetaan komputasional terhadap **{len(DF):,} sampul buku** fiksi dan puisi Indonesia "
+        f"yang terbit periode 2000–2025, dianalisis melalui tiga aspek visual: warna, tipografi, dan gaya ilustrasi.")
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
-    c1,c2,c3,c4 = st.columns(4)
-    for col,(lbl,val,sub,clr) in zip([c1,c2,c3,c4],[
-        ("Warna",    DF["warna_kategori"].notna().sum(),   "sampul dianalisis",      "#1E88E5"),
-        ("Tipografi",_tf_count(DF),                        "sampul terklasifikasi",  "#8E24AA"),
-        ("Ilustrasi",DF["gaya_ilustrasi"].notna().sum(),   "sampul terklasifikasi",  "#43A047"),
-        ("Genre",    DF["GENRES"].notna().sum(),            "sampul berlabel genre",  "#FB8C00"),
-    ]):
-        with col:
-            st.markdown(
-                f'<div class="stat-card" style="border-top:3px solid {clr};">'
-                f'<div class="lbl">{lbl}</div>'
-                f'<div class="val" style="color:{clr};">{int(val):,}</div>'
-                f'<div class="sub">{sub}</div></div>',
-                unsafe_allow_html=True)
-
-    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+    n_fiksi = int((DF["SHELF"]=="fiksi").sum())
+    n_puisi = int((DF["SHELF"]=="puisi-asli").sum())
+    n_warna = int(DF["warna_kategori"].notna().sum())
+    n_tf    = int(DF[DF["typeface_kategori"].notna()&(DF["typeface_kategori"]!="unclassified")].shape[0])
+    n_gi    = int(DF["gaya_ilustrasi"].notna().sum())
 
     c1,c2,c3,c4,c5,c6 = st.columns(6)
     for col,(lbl,val,sub,clr) in zip([c1,c2,c3,c4,c5,c6],[
@@ -469,6 +457,7 @@ elif HAL == "Warna":
     st.plotly_chart(fig_sc, use_container_width=True)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Peta Panas Warna × Genre**")
+    st.markdown("<small>Proporsi warna dominan per genre (setelah normalisasi). Sastra Indonesia, Sastra, Fiksi dikecualikan.</small>", unsafe_allow_html=True)
     hn_w = st.slider("Jumlah genre", 6, 20, 12, 2, key="hn_warna")
     st.plotly_chart(heatmap_warna_genre(DF, hn_w), use_container_width=True)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
@@ -530,6 +519,7 @@ elif HAL == "Tipografi":
         st.plotly_chart(fp, use_container_width=True)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Peta Panas Tipografi × Genre**")
+    st.markdown("<small>Proporsi typeface per genre setelah normalisasi genre.</small>", unsafe_allow_html=True)
     hn_tf = st.slider("Jumlah genre", 6, 20, 12, 2, key="hn_tf")
     st.plotly_chart(heatmap_tf_genre(DF, hn_tf), use_container_width=True)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
@@ -599,6 +589,7 @@ elif HAL == "Ilustrasi":
         st.plotly_chart(fig2, use_container_width=True)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Peta Panas Gaya Ilustrasi × Genre**")
+    st.markdown("<small>Proporsi gaya ilustrasi per genre setelah normalisasi genre.</small>", unsafe_allow_html=True)
     hn_gi = st.slider("Jumlah genre", 6, 20, 12, 2, key="hn_gi")
     st.plotly_chart(heatmap_gaya_genre(DF, hn_gi), use_container_width=True)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
