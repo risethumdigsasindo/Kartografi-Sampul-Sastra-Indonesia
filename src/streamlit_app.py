@@ -550,7 +550,7 @@ def heatmap_gaya_genre(d, top_n=12):
 with st.sidebar:
     st.markdown("### Kartografi Sampul")
     st.markdown(
-        "<small>Analisis komputasional sampul buku sastra Indonesia"
+        "<small>Analisis komputasional sampul buku sastra Indonesia",
         unsafe_allow_html=True
     )
     st.markdown("---")
