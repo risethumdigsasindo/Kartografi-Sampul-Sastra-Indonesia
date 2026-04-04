@@ -627,20 +627,18 @@ if HAL == "Beranda":
 
     # Tren terbit per tahun
     st.markdown("**Tren Terbit per Tahun**")
-    yr = DF[DF["YEAR"] > 0].groupby("YEAR").size().reset_index(name="n")
+    yr_shelf = DF[DF["YEAR"] > 0].groupby(["YEAR","SHELF"]).size().reset_index(name="n")
+    yr_shelf["Rak"] = yr_shelf["SHELF"].map(SHELF_LABEL)
     fig_yr = px.bar(
-        yr,
-        x="YEAR",
-        y="n"
+        yr_shelf, x="YEAR", y="n", color="Rak",
+        color_discrete_map={"Fiksi":"#1E88E5","Puisi":"#43A047"},
+        barmode="stack"
     )
-    fig_yr.update_layout(
-        **pb(280),
-        xaxis_title="",
-        yaxis_title="",
-        showlegend=False
-    )
-
-fig_yr.update_traces(marker_line_width=0)
+    fig_yr.update_layout(**pb(280), xaxis_title="", yaxis_title="",
+                         showlegend=True,
+                         legend=dict(orientation="h",y=-.15,font=dict(size=10)))
+    fig_yr.update_traces(marker_line_width=0)
+    st.plotly_chart(fig_yr, use_container_width=True)
 
     # Distribusi Genre
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
