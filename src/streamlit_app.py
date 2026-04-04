@@ -642,7 +642,9 @@ if HAL == "Beranda":
 
     # Distribusi Genre
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-    st.markdown("**Distribusi Genre**", unsafe_allow_html=True)
+    st.markdown("**Distribusi Genre**")
+        unsafe_allow_html=True
+    )
     
     gc_beranda = [(g,n) for g,n in _gc.most_common() if g not in GENRE_EXCLUDE and n >= 5]
     n_gr_show  = st.slider(
