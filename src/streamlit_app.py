@@ -551,7 +551,6 @@ with st.sidebar:
     st.markdown("### Kartografi Sampul")
     st.markdown(
         "<small>Analisis komputasional sampul buku sastra Indonesia "
-        "(Fiksi & Puisi, 2000–2025)</small>",
         unsafe_allow_html=True
     )
     st.markdown("---")
@@ -631,7 +630,6 @@ if HAL == "Beranda":
     yr_shelf["Rak"] = yr_shelf["SHELF"].map(SHELF_LABEL)
     fig_yr = px.bar(
         yr_shelf, x="YEAR", y="n", color="Rak",
-        color_discrete_map={"Fiksi":"#1E88E5","Puisi":"#43A047"},
         barmode="stack"
     )
     fig_yr.update_layout(**pb(280), xaxis_title="", yaxis_title="",
@@ -644,9 +642,6 @@ if HAL == "Beranda":
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Distribusi Genre**")
     st.markdown(
-        "<small>Genre dinormalisasi: Sastra → Sastra Indonesia · "
-        "Cinta/Roman/Romansa Kontemporer/Kontemporer → Romansa · "
-        "Thriller/Misteri/Misteri Thriller → Thriller/Misteri · Humor → Komedi.</small>",
         unsafe_allow_html=True
     )
     gc_beranda = [(g,n) for g,n in _gc.most_common() if g not in GENRE_EXCLUDE and n >= 5]
