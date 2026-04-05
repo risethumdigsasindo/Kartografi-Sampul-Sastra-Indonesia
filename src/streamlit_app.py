@@ -1,7 +1,13 @@
 """Kartografi Sampul Sastra Indonesia (2000-2025)"""
+import io
 import os
 from collections import Counter
 from itertools import combinations
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -597,7 +603,8 @@ def heatmap_warna_genre_klaster(d, top_n=16):
         texttemplate="%{text}",
         textfont=dict(size=9, color="#1A1A1A"),
         hovertemplate="Genre: %{y}<br>Warna: %{x}<br>Proporsi: %{text}<extra></extra>",
-        showscale=True
+        showscale=True,
+        zmin=0, zmax=1,
     ))
     fig.update_layout(**pb(
         max(360, top_n * 30),
@@ -734,28 +741,178 @@ def render_warna_legend(wc_series):
                 )
 
 
-def render_color_palette_by_genre(d):
-    """
-    Tampilkan palet warna horizontal per genre — bar proporsional berwarna
-    + keterangan nama, jumlah buku, dan persentase.
-    """
-    gc = genre_counts(d, normalize=True)
-    genres_show = [g for g, _ in gc.most_common() if g not in GENRE_EXCLUDE][:20]
+def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
+    """Buat matplotlib figure palet warna untuk genre terpilih — bisa disimpan."""
+    plt.rcParams.update({
+        "font.family": "DejaVu Sans",
+        "figure.facecolor": "white",
+        "axes.facecolor": "white",
+    })
+    n = len(genres_sel)
+    if n == 0:
+        return None
     genre_lists = expand_genres(d["GENRES"], normalize=True)
-
-    for g in genres_show:
+    # kumpulkan data warna per genre
+    palette_data = {}
+    for g in genres_sel:
         mask = [g in gl for gl in genre_lists]
         sub  = d[mask]
         if sub.empty:
             continue
-        wc = sub["warna_kategori"].value_counts()
+        wc    = sub["warna_kategori"].value_counts()
+        total = wc.sum()
+        items = [(w, int(wc.get(w, 0)), wc.get(w, 0) / total * 100 if total > 0 else 0)
+                 for w in WARNA_ORDER if wc.get(w, 0) > 0]
+        items.sort(key=lambda x: -x[2])
+        palette_data[g] = {"items": items, "n_buku": len(sub)}
+
+    if not palette_data:
+        return None
+
+    BAR_H   = 0.55   # tinggi bar per genre (axis unit)
+    GAP     = 0.45   # jarak antar genre
+    ROW     = BAR_H + GAP
+    fig_h_dyn = max(fig_h, n * ROW * 0.9 + 1.5)
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h_dyn))
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("white")
+    ax.set_xlim(0, 100)
+    ax.set_ylim(-0.3, n * ROW + 0.8)
+    ax.axis("off")
+
+    ax.text(50, n * ROW + 0.55, "Palet Warna per Genre",
+            ha="center", va="bottom", fontsize=14, fontweight="bold", color="#1A1A1A")
+    ax.text(50, n * ROW + 0.25, "Komposisi warna dominan sampul buku sastra Indonesia 2000–2025",
+            ha="center", va="bottom", fontsize=8.5, color="#888")
+
+    WARNA_HEX_LOCAL = {
+        "putih": "#F5F5F0", "hitam": "#1A1A1A", "abu": "#8E8E93",
+        "merah": "#E53935", "oranye": "#FB8C00", "kuning": "#FDD835",
+        "hijau": "#43A047", "biru": "#1E88E5", "ungu": "#8E24AA",
+    }
+    WARNA_TXT_LOCAL = {
+        "putih": "#333", "hitam": "#eee", "abu": "#fff", "merah": "#fff",
+        "oranye": "#fff", "kuning": "#333", "hijau": "#fff", "biru": "#fff", "ungu": "#fff",
+    }
+
+    for gi, g in enumerate(reversed(list(palette_data.keys()))):
+        info   = palette_data[g]
+        items  = info["items"]
+        n_buku = info["n_buku"]
+        y_bar  = gi * ROW
+
+        kl = GENRE_KLASTER_MAP.get(g)
+        kl_color = kl["color"] if kl else "#555"
+        kl_id    = f" [{kl['id']}]" if kl else ""
+
+        # genre label
+        ax.text(0, y_bar + BAR_H + 0.10,
+                f"{g}{kl_id}",
+                ha="left", va="bottom", fontsize=9, fontweight="bold", color=kl_color)
+        ax.text(99.5, y_bar + BAR_H + 0.10,
+                f"{n_buku:,} buku",
+                ha="right", va="bottom", fontsize=7.5, color="#aaa")
+
+        # bar segments
+        cx = 0.0
+        total_pct = sum(p for _, _, p in items)
+        for wname, n_w, pct in items:
+            seg_w = pct / total_pct * 100
+            ec    = "#ccc" if wname == "putih" else WARNA_HEX_LOCAL.get(wname, "#999")
+            rect  = mpatches.FancyBboxPatch(
+                (cx, y_bar), seg_w - 0.15, BAR_H,
+                boxstyle="square,pad=0",
+                facecolor=WARNA_HEX_LOCAL.get(wname, "#ccc"),
+                edgecolor=ec, linewidth=0.3,
+            )
+            ax.add_patch(rect)
+            if seg_w > 6:
+                txt_c = WARNA_TXT_LOCAL.get(wname, "#333")
+                ax.text(cx + seg_w / 2, y_bar + BAR_H / 2,
+                        f"{pct:.0f}%",
+                        ha="center", va="center",
+                        fontsize=7, color=txt_c, fontweight="bold")
+            cx += seg_w
+
+        # legend dots underneath bar
+        lx = 0.0
+        for wname, n_w, pct in items[:6]:
+            hex_c = WARNA_HEX_LOCAL.get(wname, "#ccc")
+            ec    = "#bbb" if wname == "putih" else hex_c
+            dot   = mpatches.FancyBboxPatch(
+                (lx, y_bar - 0.30), 1.2, 0.22,
+                boxstyle="square,pad=0",
+                facecolor=hex_c, edgecolor=ec, linewidth=0.25,
+            )
+            ax.add_patch(dot)
+            ax.text(lx + 1.5, y_bar - 0.19,
+                    f"{wname} {pct:.0f}%",
+                    ha="left", va="center", fontsize=6.5, color="#555")
+            lx += 15.5
+
+    ax.text(50, -0.20,
+            "Sumber: Kartografi Sampul Sastra Indonesia 2000–2025  ·  Metode: K-Means HSV (k=5)",
+            ha="center", va="top", fontsize=7, color="#bbb")
+
+    fig.tight_layout(pad=0.5)
+    return fig
+
+
+def _fig_to_bytes(fig, dpi=200):
+    """Konversi matplotlib figure ke bytes PNG."""
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def render_color_palette_by_genre(d):
+    """
+    Palet warna per genre — dengan selector genre dan tombol unduh PNG.
+    """
+    gc = genre_counts(d, normalize=True)
+    all_genres   = [g for g, _ in gc.most_common() if g not in GENRE_EXCLUDE and gc[g] >= 3]
+    genre_labels = {g: (f"[{GENRE_KLASTER_MAP[g]['id']}] {g}" if g in GENRE_KLASTER_MAP else g)
+                    for g in all_genres}
+    label_to_genre = {v: k for k, v in genre_labels.items()}
+
+    # ── opsi tampilan ────────────────────────────────────────────────────────
+    pal_c1, pal_c2 = st.columns([3, 1])
+    with pal_c1:
+        sel_labels = st.multiselect(
+            "Pilih genre yang ditampilkan",
+            options=[genre_labels[g] for g in all_genres],
+            default=[genre_labels[g] for g in all_genres[:12]],
+            key="pal_genre_sel",
+            help="Pilih satu atau lebih genre untuk ditampilkan dalam palet warna."
+        )
+    with pal_c2:
+        pal_cols_opt = st.selectbox("Kolom tampilan", [1, 2], index=0, key="pal_cols")
+
+    genres_sel = [label_to_genre[lbl] for lbl in sel_labels if lbl in label_to_genre]
+    if not genres_sel:
+        st.caption("Pilih minimal satu genre.")
+        return
+
+    genre_lists = expand_genres(d["GENRES"], normalize=True)
+
+    # ── render HTML inline (interaktif) ─────────────────────────────────────
+    cols_html = st.columns(pal_cols_opt)
+    for gi, g in enumerate(genres_sel):
+        mask = [g in gl for gl in genre_lists]
+        sub  = d[mask]
+        if sub.empty:
+            continue
+        wc    = sub["warna_kategori"].value_counts()
         total = wc.sum()
         items = [(w, int(wc.get(w, 0)), wc.get(w, 0) / total * 100 if total > 0 else 0)
                  for w in WARNA_ORDER if wc.get(w, 0) > 0]
         items.sort(key=lambda x: -x[2])
 
-        # Bar palet
-        bar_parts = ""
+        bar_parts    = ""
+        legend_parts = ""
         for _w, _n, _pct in items:
             _border = "border:1px solid rgba(0,0,0,.10);" if _w == "putih" else ""
             bar_parts += (
@@ -765,42 +922,67 @@ def render_color_palette_by_genre(d):
                 f'<span style="color:{WARNA_TXT[_w]};font-size:.55rem;font-weight:700;white-space:nowrap;">'
                 f'{"" if _pct < 9 else f"{_pct:.0f}%"}</span></div>'
             )
-
-        # Keterangan inline
-        legend_parts = ""
-        for _w, _n, _pct in items:
+        for _w, _n, _pct in items[:6]:
             _border = "border:1px solid rgba(0,0,0,.10);" if _w == "putih" else ""
             legend_parts += (
                 f'<span style="display:inline-flex;align-items:center;gap:4px;'
-                f'font-size:10.5px;margin-right:10px;">'
-                f'<span style="width:10px;height:10px;border-radius:2px;'
+                f'font-size:10px;margin-right:9px;">'
+                f'<span style="width:9px;height:9px;border-radius:2px;'
                 f'background:{WARNA_HEX[_w]};{_border}flex-shrink:0;display:inline-block;"></span>'
                 f'<span style="font-weight:500">{_w}</span>'
                 f'<span style="color:#888">{_n:,} ({_pct:.1f}%)</span>'
                 f'</span>'
             )
-
-        kl = GENRE_KLASTER_MAP.get(g)
+        kl       = GENRE_KLASTER_MAP.get(g)
         kl_badge = ""
         if kl:
             kl_badge = (f'<span style="font-size:10px;background:{kl["bg"]};color:{kl["color"]};'
                         f'padding:1px 7px;border-radius:8px;margin-left:6px;font-weight:600;">'
                         f'[{kl["id"]}]</span>')
 
+        col_obj = cols_html[gi % pal_cols_opt]
+        with col_obj:
+            st.markdown(
+                f'<div style="margin-bottom:1rem;padding:.6rem .7rem;'
+                f'border:1px solid rgba(128,128,128,.1);border-radius:8px;">'
+                f'<div style="font-size:12px;font-weight:600;margin-bottom:5px;">'
+                f'{g}{kl_badge}'
+                f'<span style="font-weight:400;color:#888;font-size:11px;margin-left:6px;">'
+                f'— {len(sub):,} buku</span></div>'
+                f'<div style="display:flex;height:22px;border-radius:5px;overflow:hidden;gap:1px;">'
+                f'{bar_parts}</div>'
+                f'<div style="margin-top:5px;line-height:1.7">{legend_parts}</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+    # ── tombol unduh gambar ──────────────────────────────────────────────────
+    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+    dl_c1, dl_c2, dl_c3 = st.columns([2, 1, 1])
+    with dl_c1:
         st.markdown(
-            f'<div style="margin-bottom:1rem;">'
-            f'<div style="font-size:12px;font-weight:600;margin-bottom:4px;">'
-            f'{g}{kl_badge}'
-            f'<span style="font-weight:400;color:#888;font-size:11px;margin-left:6px;">'
-            f'— {len(sub):,} buku</span></div>'
-            f'<div style="display:flex;height:22px;border-radius:5px;overflow:hidden;gap:1px;">'
-            f'{bar_parts}</div>'
-            f'<div style="margin-top:4px;line-height:1.6">{legend_parts}</div>'
-            f'</div>',
+            "<small>💡 <strong>Tips Word:</strong> Unduh PNG lalu sisipkan ke Word via "
+            "<em>Insert → Pictures</em>. Klik kanan gambar → <em>Wrap Text → In Line with Text</em>, "
+            "lalu tarik sudut sambil tahan Shift untuk resize tanpa pecah.</small>",
             unsafe_allow_html=True
         )
-
-
+    with dl_c2:
+        pal_dpi = st.selectbox("Resolusi", [150, 200, 300], index=1,
+                               key="pal_dpi", help="300 DPI terbaik untuk Word/cetak")
+    with dl_c3:
+        if st.button("🖼 Buat & Unduh PNG", key="btn_pal_dl", use_container_width=True):
+            with st.spinner("Membuat gambar..."):
+                fig_dl = _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7)
+                if fig_dl:
+                    img_bytes = _fig_to_bytes(fig_dl, dpi=pal_dpi)
+                    st.download_button(
+                        label="⬇ Download palette_warna.png",
+                        data=img_bytes,
+                        file_name="palette_warna_genre.png",
+                        mime="image/png",
+                        key="dl_pal_actual",
+                        use_container_width=True,
+                    )
 def render_klaster_visual(d, analysis_type="warna"):
     genre_lists_all = expand_genres(d["GENRES"], normalize=True)
     for kl in KLASTER_COOC:
@@ -1109,7 +1291,8 @@ elif HAL == "Warna":
         unsafe_allow_html=True
     )
     hn_w = st.slider("Jumlah genre", 6, 20, 16, 2, key="hn_warna")
-    st.plotly_chart(heatmap_warna_genre_klaster(DF, hn_w), use_container_width=True)
+    _hm_fig = heatmap_warna_genre_klaster(DF, hn_w)
+    st.plotly_chart(_hm_fig, use_container_width=True)
 
     # Legenda klaster
     kl_cols = st.columns(3)
@@ -1120,6 +1303,84 @@ elif HAL == "Warna":
             f'[{kl["id"]}] {kl["label"].split("—")[1].strip()}</span>',
             unsafe_allow_html=True
         )
+
+    # ── Unduh heatmap ──────────────────────────────────────────────────────
+    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+    hm_dl_c1, hm_dl_c2, hm_dl_c3 = st.columns([3, 1, 1])
+    with hm_dl_c1:
+        st.markdown(
+            "<small>💡 <strong>Tips Word:</strong> Gunakan resolusi 300 DPI. "
+            "Di Word: <em>Insert → Pictures</em>, lalu klik kanan → "
+            "<em>Wrap Text → In Line with Text</em>. Tarik sudut sambil tahan "
+            "<strong>Shift</strong> untuk resize proporsional agar tidak pecah.</small>",
+            unsafe_allow_html=True
+        )
+    with hm_dl_c2:
+        hm_dpi = st.selectbox("Resolusi", [150, 200, 300], index=2, key="hm_dpi",
+                              help="300 DPI terbaik untuk Word/cetak")
+    with hm_dl_c3:
+        if st.button("🖼 Unduh Heatmap PNG", key="btn_hm_dl", use_container_width=True):
+            with st.spinner("Membuat gambar..."):
+                # Buat matplotlib heatmap statis (bukan plotly) agar resolusi terjaga
+                genres_hm  = _top_genres_filtered(DF, hn_w)
+                warna_keys = WARNA_ORDER
+                mat_hm = __import__("pandas").DataFrame(0.0, index=genres_hm, columns=warna_keys)
+                gl_hm  = expand_genres(DF["GENRES"], normalize=True)
+                for genre_hm in genres_hm:
+                    mask_hm = [genre_hm in gl for gl in gl_hm]
+                    sub_hm  = DF[mask_hm]
+                    if len(sub_hm) == 0: continue
+                    vc_hm = sub_hm["warna_kategori"].value_counts(normalize=True)
+                    for w_hm in warna_keys:
+                        mat_hm.loc[genre_hm, w_hm] = vc_hm.get(w_hm, 0.0)
+                warna_counts_hm = DF["warna_kategori"].value_counts()
+                x_tick_labels = [f"{w}\n({int(warna_counts_hm.get(w,0)):,})" for w in warna_keys]
+                y_tick_labels = []
+                for g_hm in genres_hm:
+                    kl_hm = GENRE_KLASTER_MAP.get(g_hm)
+                    y_tick_labels.append(f"{g_hm}  [{kl_hm['id']}]" if kl_hm else g_hm)
+
+                fig_hm_dl, ax_hm = plt.subplots(
+                    figsize=(15, max(6, len(genres_hm) * 0.55 + 2))
+                )
+                fig_hm_dl.patch.set_facecolor("white")
+                z_vals = mat_hm.values
+                im = ax_hm.imshow(z_vals, aspect="auto", cmap="YlOrRd", vmin=0, vmax=0.6)
+                ax_hm.set_xticks(range(len(warna_keys)))
+                ax_hm.set_xticklabels(x_tick_labels, fontsize=8)
+                ax_hm.set_yticks(range(len(genres_hm)))
+                ax_hm.set_yticklabels(y_tick_labels, fontsize=8)
+                ax_hm.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
+                for (row_i, col_i), val in __import__("numpy").ndenumerate(z_vals):
+                    txt = f"{val*100:.1f}%"
+                    ax_hm.text(col_i, row_i, txt, ha="center", va="center",
+                               fontsize=7, color="#1A1A1A", fontweight="bold")
+                # Garis pemisah klaster
+                kl_ids_hm = [GENRE_KLASTER_MAP.get(g_hm, {}).get("id","none") for g_hm in genres_hm]
+                for sep_i in range(1, len(kl_ids_hm)):
+                    if kl_ids_hm[sep_i] != kl_ids_hm[sep_i-1]:
+                        ax_hm.axhline(y=sep_i - 0.5, color="#555", linewidth=1.2,
+                                      linestyle="--", alpha=0.5)
+                plt.colorbar(im, ax=ax_hm, fraction=0.03, pad=0.02,
+                             label="Proporsi warna dalam genre")
+                ax_hm.set_title(
+                    "Peta Panas Warna × Genre  (label [K1/K2/K3] = klaster co-occurrence)",
+                    fontsize=11, fontweight="bold", pad=14
+                )
+                fig_hm_dl.tight_layout()
+                buf_hm = io.BytesIO()
+                fig_hm_dl.savefig(buf_hm, format="png", dpi=hm_dpi,
+                                  bbox_inches="tight", facecolor="white")
+                plt.close(fig_hm_dl)
+                buf_hm.seek(0)
+                st.download_button(
+                    label="⬇ Download heatmap_warna.png",
+                    data=buf_hm.getvalue(),
+                    file_name="heatmap_warna_genre.png",
+                    mime="image/png",
+                    key="dl_hm_actual",
+                    use_container_width=True,
+                )
 
     # ── PALET WARNA PER GENRE ──────────────────────────────────────────────
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
