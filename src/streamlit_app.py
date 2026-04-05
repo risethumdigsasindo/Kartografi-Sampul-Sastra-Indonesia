@@ -602,9 +602,6 @@ def heatmap_warna_genre_klaster(d, top_n=16):
         xaxis_title="",
         yaxis_title="",
         xaxis=dict(tickangle=0),
-        title=dict(
-            text="Peta Panas Warna × Genre (label [K1/K2/K3] = klaster co-occurrence)",
-            font=dict(size=12), x=0, xanchor="left"
         )
     ))
 
