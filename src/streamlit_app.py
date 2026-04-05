@@ -160,8 +160,7 @@ KLASTER_COOC = [
         "short": "Klaster 1",
         "color": "#2E4057",
         "bg":    "#EEF2F7",
-        "genres": ["Novel","Cerita Pendek",
-                   "Antologi"]
+        "genres": ["Novel","Cerita Pendek","Antologi","Puisi"],
         "pairs": [
             ("Drama",         "Novel"),
             ("Novel",         "Remaja"),
