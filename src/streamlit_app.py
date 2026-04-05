@@ -194,14 +194,14 @@ KLASTER_COOC = [
         "color": "#1D9E75",
         "bg":    "#EEF8F4",
         "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Ilmiah",
-                   "Thriller/Misteri","Horor","Fiksi Sejarah","Sejarah"],
+                   "Thriller/Misteri","Horor","Fiksi Sejarah"],
         "pairs": [
             ("Fantasi",       "Fiksi Ilmiah"),
             ("Fantasi",       "Petualangan"),
             ("Aksi",          "Fantasi"),
             ("Aksi",          "Petualangan"),
             ("Horor",         "Thriller/Misteri"),
-            ("Fiksi Sejarah", "Sejarah"),
+            ("Fiksi Sejarah"),
         ],
     },
 ]
