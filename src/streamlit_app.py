@@ -330,45 +330,7 @@ def render_cooc_table(cooc_df, counts):
       <th>Overlap</th><th>Overlap %</th>
     </tr></thead><tbody>
     """
-    # Tambahkan baris puisi terpisah di akhir
-    puisi_pairs = [("Puisi","Sastra"), ("Puisi","Romansa"), ("Puisi","Novel")]
-
-    for kl in KLASTER_COOC:
-        html += f'<tr class="cluster-row"><td colspan="6">{kl["label"]}</td></tr>\n'
-        for g1, g2 in kl["pairs"]:
-            r = lookup.get((g1, g2)) or lookup.get((g2, g1))
-            if r is None:
-                continue
-            pct = int(r['pct'])
-            bg, fg = _pill_color(pct)
-            n1 = f"{int(r['ca']):,}".replace(',', '.')
-            n2 = f"{int(r['cb']):,}".replace(',', '.')
-            ov = f"{int(r['ov']):,}".replace(',', '.')
-            html += (
-                f"<tr><td><strong>{g1}</strong></td><td><strong>{g2}</strong></td>"
-                f"<td>{n1}</td><td>{n2}</td><td>{ov}</td>"
-                f"<td><span class='pill-cooc' style='background:{bg};color:{fg};'>{pct}%</span></td></tr>\n"
-            )
-
-    # Puisi anomali
-    html += '<tr class="cluster-row"><td colspan="6">Catatan — Puisi sebagai anomali struktural</td></tr>\n'
-    for g1, g2 in puisi_pairs:
-        r = lookup.get((g1, g2)) or lookup.get((g2, g1))
-        if r is None:
-            continue
-        pct = int(r['pct'])
-        bg, fg = _pill_color(pct)
-        n1 = f"{int(r['ca']):,}".replace(',', '.')
-        n2 = f"{int(r['cb']):,}".replace(',', '.')
-        ov = f"{int(r['ov']):,}".replace(',', '.')
-        html += (
-            f"<tr><td><strong>{g1}</strong></td><td><strong>{g2}</strong></td>"
-            f"<td>{n1}</td><td>{n2}</td><td>{ov}</td>"
-            f"<td><span class='pill-cooc' style='background:{bg};color:{fg};'>{pct}%</span></td></tr>\n"
-        )
-
-    html += "</tbody></table>"
-
+   
     # Legend
     legend = (
         "<div style='display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;"
