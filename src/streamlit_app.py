@@ -149,8 +149,12 @@ GENRE_NORM = {
     "Misteri":             "Thriller/Misteri",
     "Misteri Thriller":    "Thriller/Misteri",
     "Humor":               "Komedi",
+    "Sejarah":             "Fiksi Sejarah",
+    "Historical Fiction":  "Fiksi Sejarah",
+    "Historical":          "Fiksi Sejarah",
 }
-GENRE_EXCLUDE = {"Sastra Indonesia", "Sastra", "Fiksi"}
+GENRE_EXCLUDE = {"Sastra Indonesia", "Sastra", "Fiksi", "Nonfiction", "Non-fiction",
+                 "Nonfiksi", "Non Fiksi", "Non-fiksi", "Nonfiction (General)"}
 
 # ── Tiga klaster co-occurrence ───────────────────────────────────────────────
 KLASTER_COOC = [
@@ -297,13 +301,15 @@ def compute_cooccurrence(_df, min_count=30):
         'Misteri Thriller':'Thriller/Misteri','Humor':'Komedi',
         'Cinta':'Romansa','Sejarah':'Fiksi Sejarah','Romansa Kontemporer':'Romansa',
         'Kontemporer':'Romansa','Roman':'Romansa',
+        'Historical Fiction':'Fiksi Sejarah','Historical':'Fiksi Sejarah',
     }
+    NONFICTION_VARIANTS = {'nonfiction','non-fiction','nonfiksi','non fiksi','non-fiksi','nonfiction (general)'}
     def parse(g):
         if pd.isna(g): return []
         res = []
         for p in str(g).split(','):
             p = p.strip()
-            if p.lower() not in EXCL and len(p) > 1:
+            if p.lower() not in EXCL and p.lower() not in NONFICTION_VARIANTS and len(p) > 1:
                 res.append(NORM.get(p, p))
         return list(set(res))
     genre_lists = _df['GENRES'].apply(parse)
@@ -569,11 +575,18 @@ def heatmap_warna_genre_klaster(d, top_n=16):
         else:
             y_labels.append(g)
 
+    # Label X: tambahkan jumlah buku per warna
+    warna_counts = d["warna_kategori"].value_counts()
+    x_labels = []
+    for w in warna_keys:
+        n = int(warna_counts.get(w, 0))
+        x_labels.append(f"{w}<br>({n:,} buku)")
+
     text_mat = (mat * 100).round(1).astype(str) + "%"
 
     fig = go.Figure(data=go.Heatmap(
         z=mat.values,
-        x=warna_keys,
+        x=x_labels,
         y=y_labels,
         colorscale="YlOrRd",
         text=text_mat.values,
@@ -584,10 +597,11 @@ def heatmap_warna_genre_klaster(d, top_n=16):
     ))
     fig.update_layout(**pb(
         max(360, top_n * 30),
-        margin=dict(l=180, r=20, t=40, b=60),
+        margin=dict(l=180, r=20, t=40, b=80),
         yaxis=dict(autorange="reversed"),
         xaxis_title="",
         yaxis_title="",
+        xaxis=dict(tickangle=0),
         title=dict(
             text="Peta Panas Warna × Genre (label [K1/K2/K3] = klaster co-occurrence)",
             font=dict(size=12), x=0, xanchor="left"
@@ -1504,6 +1518,40 @@ elif HAL == "Genre":
                                           yaxis=dict(categoryorder="total ascending"))
                     fig_diff.add_vline(x=0, line_dash="dash", line_color="rgba(128,128,128,.4)")
                     st.plotly_chart(fig_diff, use_container_width=True)
+
+                # ── COLOR PALETTE PER GENRE ─────────────────────────────────
+                st.markdown("**Palet Warna Genre**")
+                _total_g = wc_g.sum()
+                _palette_items = [(w, int(wc_g.get(w,0)), wc_g.get(w,0)/_total_g*100 if _total_g>0 else 0)
+                                   for w in WARNA_ORDER if wc_g.get(w,0) > 0]
+                _palette_items.sort(key=lambda x: -x[2])
+                # Bar palet berwarna
+                _pal_html = '<div style="display:flex;height:28px;border-radius:6px;overflow:hidden;gap:1px;margin-bottom:.6rem;">'
+                for _w, _n, _pct in _palette_items:
+                    _border = "border:1px solid rgba(0,0,0,.10);" if _w == "putih" else ""
+                    _pal_html += (
+                        f'<div style="background:{WARNA_HEX[_w]};width:{_pct:.1f}%;'
+                        f'display:flex;align-items:center;justify-content:center;'
+                        f'{_border}overflow:hidden;" '
+                        f'title="{_w}: {_pct:.1f}%">'
+                        f'<span style="color:{WARNA_TXT[_w]};font-size:.6rem;font-weight:600;white-space:nowrap;">'
+                        f'{"" if _pct < 8 else f"{_pct:.0f}%"}</span></div>'
+                    )
+                _pal_html += '</div>'
+                # Keterangan teks
+                _leg_html = '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:.2rem;">'
+                for _w, _n, _pct in _palette_items:
+                    _border = "border:1px solid rgba(0,0,0,.12);" if _w == "putih" else ""
+                    _leg_html += (
+                        f'<div style="display:flex;align-items:center;gap:5px;font-size:11px;">'
+                        f'<div style="width:11px;height:11px;border-radius:2px;'
+                        f'background:{WARNA_HEX[_w]};{_border}flex-shrink:0;"></div>'
+                        f'<span style="font-weight:500">{_w}</span>'
+                        f'<span style="color:#888">{_n:,} buku ({_pct:.1f}%)</span>'
+                        f'</div>'
+                    )
+                _leg_html += '</div>'
+                st.markdown(_pal_html + _leg_html, unsafe_allow_html=True)
 
                 st.markdown("**Contoh sampul per warna dominan**")
                 top_w = wc_g.head(4).index.tolist()
