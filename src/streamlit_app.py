@@ -160,9 +160,8 @@ KLASTER_COOC = [
         "short": "Klaster 1",
         "color": "#2E4057",
         "bg":    "#EEF2F7",
-        "genres": ["Novel","Drama","Romansa","Remaja","Cerita Pendek",
-                   "Antologi","Fantasi","Fiksi Sejarah","Komedi",
-                   "Thriller/Misteri","Keluarga","Dewasa"],
+        "genres": ["Novel","Cerita Pendek",
+                   "Antologi"]
         "pairs": [
             ("Drama",         "Novel"),
             ("Novel",         "Remaja"),
@@ -195,7 +194,7 @@ KLASTER_COOC = [
         "short": "Klaster 3",
         "color": "#1D9E75",
         "bg":    "#EEF8F4",
-        "genres": ["Fantasi","Petualangan","Aksi","Fiksi Ilmiah",
+        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Ilmiah",
                    "Thriller/Misteri","Horor","Fiksi Sejarah","Sejarah"],
         "pairs": [
             ("Fantasi",       "Fiksi Ilmiah"),
@@ -297,7 +296,7 @@ def compute_cooccurrence(_df, min_count=30):
     NORM = {
         'Misteri':'Thriller/Misteri','Thriller':'Thriller/Misteri',
         'Misteri Thriller':'Thriller/Misteri','Humor':'Komedi',
-        'Cinta':'Romansa','Romansa Kontemporer':'Romansa',
+        'Cinta':'Romansa','Sejarah':'Fiksi Sejarah','Romansa Kontemporer':'Romansa',
         'Kontemporer':'Romansa','Roman':'Romansa',
     }
     def parse(g):
