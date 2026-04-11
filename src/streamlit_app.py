@@ -166,7 +166,7 @@ GENRE_NORM = {
     "New Adult":            "Remaja",
     "Collections":           "Antologi",
     "Middle Grade":         "Fantasi",
-    "Distopia":            "Fiksi Ilmiah",
+    "Distopia":            "Fiksi Sains",
     "Sejarah":             "Fiksi Sejarah",
     "Historical Fiction":  "Fiksi Sejarah",
     "Historical":          "Fiksi Sejarah",
@@ -216,10 +216,10 @@ KLASTER_COOC = [
         "short": "Klaster 3",
         "color": "#1D9E75",
         "bg":    "#EEF8F4",
-        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Ilmiah",
+        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Sains",
                    "Thriller/Misteri","Horor","Anak-anak","Fiksi Sejarah"],
         "pairs": [
-            ("Fantasi",       "Fiksi Ilmiah"),
+            ("Fantasi",       "Fiksi Sains"),
             ("Fantasi",       "Petualangan"),
             ("Aksi",          "Fantasi"),
             ("Aksi",          "Petualangan"),
@@ -1495,6 +1495,8 @@ elif HAL == "Warna":
     with wc1: q_w   = st.text_input("Judul / penulis", key="w_q")
     with wc2: w_sel = st.selectbox("Filter warna", ["Semua"]+semua_warna, key="w_sel")
     with wc3: n_w   = st.slider("Tampilkan", 4, 32, 8, 4, key="w_n")
+    top25_w = [g for g,_ in _gc.most_common() if g not in GENRE_EXCLUDE][:25]
+    g_sel_w = st.selectbox("Filter genre", ["Semua"] + top25_w, key="w_genre")
     dw = DF[DF["image_ok"]].copy()
     if q_w:
         ql = q_w.lower()
@@ -1502,6 +1504,10 @@ elif HAL == "Warna":
                 dw["AUTHOR"].str.lower().str.contains(ql, na=False)]
     if w_sel != "Semua":
         dw = dw[dw["warna_kategori"] == w_sel]
+    if g_sel_w != "Semua":
+        gl_w   = expand_genres(dw["GENRES"], normalize=True)
+        mask_w = [g_sel_w in gl for gl in gl_w]
+        dw     = dw[mask_w]
     if not dw.empty:
         grid(dw.head(n_w))
 
