@@ -56,21 +56,25 @@ hr.thin{border:none;border-top:1px solid rgba(128,128,128,.12);margin:1.3rem 0;}
 
 # ── KONSTANTA ────────────────────────────────────────────────────────────────
 WARNA_HEX = {
-    "putih":  "#F5F5F0",
-    "hitam":  "#1A1A1A",
-    "abu":    "#8E8E93",
-    "merah":  "#E53935",
-    "oranye": "#FB8C00",
-    "kuning": "#FDD835",
-    "hijau":  "#43A047",
-    "biru":   "#1E88E5",
-    "ungu":   "#8E24AA",
+    "putih":      "#F5F5F0",
+    "hitam":      "#1A1A1A",
+    "abu":        "#8E8E93",
+    "merah":      "#E53935",
+    "merah_muda": "#F06292",   # ← baru
+    "oranye":     "#FB8C00",
+    "cokelat":    "#795548",   # ← baru
+    "kuning":     "#FDD835",
+    "hijau":      "#43A047",
+    "biru":       "#1E88E5",
+    "ungu":       "#8E24AA",
 }
 WARNA_TXT = {
     "putih":"#333","hitam":"#eee","abu":"#fff","merah":"#fff",
-    "oranye":"#fff","kuning":"#333","hijau":"#fff","biru":"#fff","ungu":"#fff"
+    "merah_muda":"#fff","oranye":"#fff","cokelat":"#fff",
+    "kuning":"#333","hijau":"#fff","biru":"#fff","ungu":"#fff"
 }
-WARNA_ORDER = ["putih","oranye","biru","merah","hitam","kuning","ungu","hijau","abu"]
+WARNA_ORDER = ["putih","oranye","cokelat","biru","merah","merah_muda",
+               "hitam","kuning","ungu","hijau","abu"]
 
 TYPEFACE_ID = {
     "humanist_serif":      "Humanist Serif",
@@ -259,33 +263,42 @@ def _reklasifikasi_warna(row):
         v = float(row.get("warna_v_1", 0) or 0)
     except Exception:
         return row.get("warna_kategori", "putih")
-    if v < 50: return "hitam"
-    if s < 30 and v > 160: return "putih"
-    if s < 50: return "putih" if v > 160 else "abu"
-    if h < 10 or h >= 170: return "merah"
-    elif h < 25: return "oranye"
-    elif h < 40: return "kuning"
-    elif h < 85: return "hijau"
-    elif h < 130: return "biru"
-    elif h < 170: return "ungu"
+    if v < 50:               return "hitam"
+    if s < 30 and v > 160:  return "putih"
+    if s < 50:               return "putih" if v > 160 else "abu"
+    if (h < 25) and (v < 140) and (s > 80):
+        return "cokelat"
+    if (h < 10 or h >= 160) and v > 160 and s < 160:
+        return "merah_muda"
+    if h < 10 or h >= 170:  return "merah"
+    elif h < 25:             return "oranye"
+    elif h < 40:             return "kuning"
+    elif h < 85:             return "hijau"
+    elif h < 130:            return "biru"
+    elif h < 170:            return "ungu"
     return "merah"
 
 
 def _klasifikasi_hsv(h, s, v):
-    """Klasifikasi satu warna dari nilai HSV (skala OpenCV: H 0-180, S 0-255, V 0-255)."""
     try:
         h, s, v = float(h or 0), float(s or 0), float(v or 0)
     except Exception:
         return None
-    if v < 50:              return "hitam"
-    if s < 30 and v > 160: return "putih"
-    if s < 50:             return "putih" if v > 160 else "abu"
-    if h < 10 or h >= 170: return "merah"
-    elif h < 25:            return "oranye"
-    elif h < 40:            return "kuning"
-    elif h < 85:            return "hijau"
-    elif h < 130:           return "biru"
-    elif h < 170:           return "ungu"
+    if v < 50:               return "hitam"
+    if s < 30 and v > 160:  return "putih"
+    if s < 50:               return "putih" if v > 160 else "abu"
+    # cokelat: hue oranye TAPI gelap (V rendah) atau saturasi tinggi+gelap
+    if (h < 25) and (v < 140) and (s > 80):
+        return "cokelat"
+    # merah muda: hue merah TAPI terang dan saturasi sedang
+    if (h < 10 or h >= 160) and v > 160 and s < 160:
+        return "merah_muda"
+    if h < 10 or h >= 170:  return "merah"
+    elif h < 25:             return "oranye"
+    elif h < 40:             return "kuning"
+    elif h < 85:             return "hijau"
+    elif h < 130:            return "biru"
+    elif h < 170:            return "ungu"
     return "merah"
 
 
@@ -1298,8 +1311,10 @@ elif HAL == "Warna":
             "4. Re-klasifikasi otomatis dijalankan pada load data. **Akurasi ~87%** (200 sampel)."
         )
         hue_info = [
-            ("merah","0–10° & 340°+"),("oranye","20–50°"),("kuning","50–80°"),
-            ("hijau","80–170°"),("biru","170–260°"),("ungu","260–340°"),
+            ("merah","0–10° & 340°+"),("merah_muda","0–10°, V tinggi"),
+            ("oranye","10–25°, V≥140"),("cokelat","10–25°, V<140"),
+            ("kuning","25–40°"),("hijau","40–85°"),
+            ("biru","85–130°"),("ungu","130–170°"),
             ("abu","S rendah"),("hitam","V<50"),("putih","S<30 & V>160"),
         ]
         hcols = st.columns(len(hue_info))
