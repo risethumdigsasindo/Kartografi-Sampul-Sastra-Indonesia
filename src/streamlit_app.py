@@ -147,6 +147,7 @@ SHELF_LABEL = {"fiksi":"Fiksi","puisi-asli":"Puisi"}
 
 GENRE_NORM = {
     "Sastra":              "Sastra Indonesia",
+    "Literary Fiction":    "Sastra indonesia",
     "Cinta":               "Romansa",
     "Roman":               "Romansa",
     "Romansa Kontemporer": "Romansa",
@@ -161,6 +162,12 @@ GENRE_NORM = {
     "Kriminal":            "Thriller/Misteri",
     "Supranatural":        "Horor",
     "Humor":               "Komedi",
+    "Romansatic":          "Romansa",
+    "Young Adult Romansace": "Romansa",
+    "New Adult":            "Remaja",
+    "Collections":           "Antologi",
+    "Middle Grade":         "Fantasi",
+    "Distopia":            "Fiksi Ilmiah",
     "Sejarah":             "Fiksi Sejarah",
     "Historical Fiction":  "Fiksi Sejarah",
     "Historical":          "Fiksi Sejarah",
