@@ -154,20 +154,7 @@ GENRE_NORM = {
     "Thriller":            "Thriller/Misteri",
     "Misteri":             "Thriller/Misteri",
     "Misteri Thriller":    "Thriller/Misteri",
-    "Thriller Suspense":    "Thriller/Misteri",
-    "Psychological Thriller":    "Thriller/Misteri",
-    "Suspense":            "Thriller/Misteri",
-    "Detective":           "Thriller/Misteri",
-    "Kriminal":            "Thriller/Misteri",
-    "Supranatural":        "Horor",
     "Humor":               "Komedi",
-    "Romansatic":          "Romansa",
-    "Young Adult Romansace": "Romansa",
-    "New Adult":            "Remaja",
-    "Collections":           "Antologi",
-    "Middle Grade":         "Fantasi",
-    "Fiksi Ilmiah":        "Fiksi Sains",
-    "Distopia":            "Fiksi Sains",
     "Sejarah":             "Fiksi Sejarah",
     "Historical Fiction":  "Fiksi Sejarah",
     "Historical":          "Fiksi Sejarah",
@@ -217,10 +204,10 @@ KLASTER_COOC = [
         "short": "Klaster 3",
         "color": "#1D9E75",
         "bg":    "#EEF8F4",
-        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Sains",
+        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Ilmiah",
                    "Thriller/Misteri","Horor","Anak-anak","Fiksi Sejarah"],
         "pairs": [
-            ("Fantasi",       "Fiksi Sains"),
+            ("Fantasi",       "Fiksi Ilmiah"),
             ("Fantasi",       "Petualangan"),
             ("Aksi",          "Fantasi"),
             ("Aksi",          "Petualangan"),
@@ -810,119 +797,143 @@ def render_warna_legend(wc_series, is_proporsi=False):
 
 
 def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
-    """Buat matplotlib figure palet warna untuk genre terpilih — bisa disimpan."""
+    """
+    Buat matplotlib figure palet warna — layout dua kolom, compact, Word-friendly.
+    Rasio mendekati A4 landscape (29.7 × 21 cm ≈ 15 × 10.6 in pada 72 dpi).
+    """
     plt.rcParams.update({
         "font.family": "DejaVu Sans",
         "figure.facecolor": "white",
-        "axes.facecolor": "white",
+        "axes.facecolor":   "white",
     })
+
     n = len(genres_sel)
     if n == 0:
         return None
+
     genre_lists = expand_genres(d["GENRES"], normalize=True)
-    # kumpulkan data warna per genre — gunakan distribusi keseluruhan
     palette_data = {}
     for g in genres_sel:
         mask = [g in gl for gl in genre_lists]
         sub  = d[mask]
         if sub.empty:
             continue
-        wc    = compute_warna_distribusi(sub)  # proporsi 0..1
-        items = [(w, wc.get(w, 0) * 100)
-                 for w in WARNA_ORDER if wc.get(w, 0) > 0]
+        wc    = compute_warna_distribusi(sub)
+        items = [(w, wc.get(w, 0) * 100) for w in WARNA_ORDER if wc.get(w, 0) > 0]
         items.sort(key=lambda x: -x[1])
         palette_data[g] = {"items": items, "n_buku": len(sub)}
 
     if not palette_data:
         return None
 
-    BAR_H   = 0.55   # tinggi bar per genre (axis unit)
-    GAP     = 0.45   # jarak antar genre
-    ROW     = BAR_H + GAP
-    fig_h_dyn = max(fig_h, n * ROW * 0.9 + 1.5)
-
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h_dyn))
-    fig.patch.set_facecolor("white")
-    ax.set_facecolor("white")
-    ax.set_xlim(0, 100)
-    ax.set_ylim(-0.3, n * ROW + 0.8)
-    ax.axis("off")
-
-    ax.text(50, n * ROW + 0.55, "Palet Warna per Genre",
-            ha="center", va="bottom", fontsize=14, fontweight="bold", color="#1A1A1A")
-    ax.text(50, n * ROW + 0.25, "Komposisi warna dominan sampul buku sastra Indonesia 2000–2025",
-            ha="center", va="bottom", fontsize=8.5, color="#888")
-
     WARNA_HEX_LOCAL = {
         "putih": "#F5F5F0", "hitam": "#1A1A1A", "abu": "#8E8E93",
         "merah": "#E53935", "oranye": "#FB8C00", "kuning": "#FDD835",
-        "hijau": "#43A047", "biru": "#1E88E5", "ungu": "#8E24AA",
+        "hijau": "#43A047", "biru":  "#1E88E5", "ungu": "#8E24AA",
     }
     WARNA_TXT_LOCAL = {
-        "putih": "#333", "hitam": "#eee", "abu": "#fff", "merah": "#fff",
-        "oranye": "#fff", "kuning": "#333", "hijau": "#fff", "biru": "#fff", "ungu": "#fff",
+        "putih": "#333",  "hitam": "#eee", "abu":  "#fff", "merah":  "#fff",
+        "oranye": "#fff", "kuning":"#333", "hijau":"#fff", "biru":   "#fff", "ungu": "#fff",
     }
 
-    for gi, g in enumerate(reversed(list(palette_data.keys()))):
+    # Layout dua kolom
+    N_COLS   = 2
+    n_rows   = (n + N_COLS - 1) // N_COLS
+    COL_W    = 48.0
+    COL_GAP  = 4.0
+    BAR_H    = 0.36
+    LBL_H    = 0.26
+    LEG_H    = 0.22
+    ROW_GAP  = 0.18
+    ROW      = BAR_H + LBL_H + LEG_H + ROW_GAP
+
+    H_PER_ROW = 0.72
+    HEADER_IN = 0.55
+    FOOTER_IN = 0.25
+    fig_h_dyn = max(5.0, min(14.0, n_rows * H_PER_ROW + HEADER_IN + FOOTER_IN))
+    fig_w_use = 15.0
+
+    AX_H   = n_rows * ROW + 0.4
+    AX_W   = N_COLS * COL_W + (N_COLS - 1) * COL_GAP
+
+    fig, ax = plt.subplots(figsize=(fig_w_use, fig_h_dyn))
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("white")
+    ax.set_xlim(0, AX_W)
+    ax.set_ylim(-0.35, AX_H + 0.55)
+    ax.axis("off")
+
+    ax.text(AX_W / 2, AX_H + 0.45,
+            "Palet Warna per Genre",
+            ha="center", va="bottom", fontsize=13, fontweight="bold", color="#1A1A1A")
+    ax.text(AX_W / 2, AX_H + 0.20,
+            "Komposisi warna dominan sampul buku sastra Indonesia 2000–2025",
+            ha="center", va="bottom", fontsize=8, color="#888")
+
+    genres_list = list(palette_data.keys())
+
+    for idx, g in enumerate(genres_list):
+        col_i  = idx % N_COLS
+        row_i  = idx // N_COLS
+        y_top  = AX_H - (row_i + 1) * ROW + ROW_GAP / 2
+        y_bar  = y_top + LEG_H
+        x_off  = col_i * (COL_W + COL_GAP)
+
         info   = palette_data[g]
         items  = info["items"]
         n_buku = info["n_buku"]
-        y_bar  = gi * ROW
 
-        kl = GENRE_KLASTER_MAP.get(g)
+        kl       = GENRE_KLASTER_MAP.get(g)
         kl_color = kl["color"] if kl else "#555"
         kl_id    = f" [{kl['id']}]" if kl else ""
 
-        # genre label
-        ax.text(0, y_bar + BAR_H + 0.10,
+        ax.text(x_off, y_bar + BAR_H + 0.04,
                 f"{g}{kl_id}",
-                ha="left", va="bottom", fontsize=9, fontweight="bold", color=kl_color)
-        ax.text(99.5, y_bar + BAR_H + 0.10,
-                f"{n_buku:,} buku",
-                ha="right", va="bottom", fontsize=7.5, color="#aaa")
+                ha="left", va="bottom", fontsize=8.5, fontweight="bold", color=kl_color)
+        ax.text(x_off + COL_W, y_bar + BAR_H + 0.04,
+                f"n={n_buku:,}",
+                ha="right", va="bottom", fontsize=7, color="#aaa")
 
-        # bar segments
-        cx = 0.0
+        cx = x_off
         total_pct = sum(p for _, p in items)
         for wname, pct in items:
-            seg_w = pct / total_pct * 100 if total_pct > 0 else 0
+            seg_w = pct / total_pct * COL_W if total_pct > 0 else 0
             ec    = "#ccc" if wname == "putih" else WARNA_HEX_LOCAL.get(wname, "#999")
             rect  = mpatches.FancyBboxPatch(
-                (cx, y_bar), seg_w - 0.15, BAR_H,
+                (cx, y_bar), seg_w - 0.08, BAR_H,
                 boxstyle="square,pad=0",
                 facecolor=WARNA_HEX_LOCAL.get(wname, "#ccc"),
-                edgecolor=ec, linewidth=0.3,
+                edgecolor=ec, linewidth=0.25,
             )
             ax.add_patch(rect)
-            if seg_w > 6:
+            if seg_w > COL_W * 0.07:
                 txt_c = WARNA_TXT_LOCAL.get(wname, "#333")
                 ax.text(cx + seg_w / 2, y_bar + BAR_H / 2,
                         f"{pct:.0f}%",
                         ha="center", va="center",
-                        fontsize=7, color=txt_c, fontweight="bold")
+                        fontsize=6.5, color=txt_c, fontweight="bold")
             cx += seg_w
 
-        # legend dots underneath bar
-        lx = 0.0
-        for wname, pct in items[:6]:
+        lx = x_off
+        for wname, pct in items[:5]:
             hex_c = WARNA_HEX_LOCAL.get(wname, "#ccc")
             ec    = "#bbb" if wname == "putih" else hex_c
             dot   = mpatches.FancyBboxPatch(
-                (lx, y_bar - 0.30), 1.2, 0.22,
+                (lx, y_top + 0.04), 0.9, LEG_H * 0.7,
                 boxstyle="square,pad=0",
-                facecolor=hex_c, edgecolor=ec, linewidth=0.25,
+                facecolor=hex_c, edgecolor=ec, linewidth=0.2,
             )
             ax.add_patch(dot)
-            ax.text(lx + 1.5, y_bar - 0.19,
+            ax.text(lx + 1.1, y_top + LEG_H * 0.4,
                     f"{wname} {pct:.0f}%",
-                    ha="left", va="center", fontsize=6.5, color="#555")
-            lx += 15.5
+                    ha="left", va="center", fontsize=6, color="#555")
+            lx += COL_W / 5
 
-    ax.text(50, -0.20,
+    ax.text(AX_W / 2, -0.28,
             "Sumber: Kartografi Sampul Sastra Indonesia 2000–2025  ·  Metode: K-Means HSV (k=5)",
-            ha="center", va="top", fontsize=7, color="#bbb")
+            ha="center", va="top", fontsize=6.5, color="#bbb")
 
-    fig.tight_layout(pad=0.5)
+    fig.tight_layout(pad=0.4)
     return fig
 
 
@@ -1496,8 +1507,6 @@ elif HAL == "Warna":
     with wc1: q_w   = st.text_input("Judul / penulis", key="w_q")
     with wc2: w_sel = st.selectbox("Filter warna", ["Semua"]+semua_warna, key="w_sel")
     with wc3: n_w   = st.slider("Tampilkan", 4, 32, 8, 4, key="w_n")
-    top25_w = [g for g,_ in _gc.most_common() if g not in GENRE_EXCLUDE][:25]
-    g_sel_w = st.selectbox("Filter genre", ["Semua"] + top25_w, key="w_genre")
     dw = DF[DF["image_ok"]].copy()
     if q_w:
         ql = q_w.lower()
@@ -1505,10 +1514,6 @@ elif HAL == "Warna":
                 dw["AUTHOR"].str.lower().str.contains(ql, na=False)]
     if w_sel != "Semua":
         dw = dw[dw["warna_kategori"] == w_sel]
-    if g_sel_w != "Semua":
-        gl_w   = expand_genres(dw["GENRES"], normalize=True)
-        mask_w = [g_sel_w in gl for gl in gl_w]
-        dw     = dw[mask_w]
     if not dw.empty:
         grid(dw.head(n_w))
 
