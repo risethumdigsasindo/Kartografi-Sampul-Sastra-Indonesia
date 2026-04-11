@@ -204,10 +204,10 @@ KLASTER_COOC = [
         "short": "Klaster 3",
         "color": "#1D9E75",
         "bg":    "#EEF8F4",
-        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Ilmiah",
+        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Sains",
                    "Thriller/Misteri","Horor","Anak-anak","Fiksi Sejarah"],
         "pairs": [
-            ("Fantasi",       "Fiksi Ilmiah"),
+            ("Fantasi",       "Fiksi Sains"),
             ("Fantasi",       "Petualangan"),
             ("Aksi",          "Fantasi"),
             ("Aksi",          "Petualangan"),
