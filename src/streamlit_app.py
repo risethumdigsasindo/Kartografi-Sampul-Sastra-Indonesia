@@ -56,25 +56,21 @@ hr.thin{border:none;border-top:1px solid rgba(128,128,128,.12);margin:1.3rem 0;}
 
 # ── KONSTANTA ────────────────────────────────────────────────────────────────
 WARNA_HEX = {
-    "putih":   "#F5F5F0",
-    "hitam":   "#1A1A1A",
-    "abu":     "#8E8E93",
-    "merah":   "#E53935",
-    "pink":    "#F06292",
-    "oranye":  "#FB8C00",
-    "cokelat": "#795548",
-    "kuning":  "#FDD835",
-    "hijau":   "#43A047",
-    "biru":    "#1E88E5",
-    "ungu":    "#8E24AA",
+    "putih":  "#F5F5F0",
+    "hitam":  "#1A1A1A",
+    "abu":    "#8E8E93",
+    "merah":  "#E53935",
+    "oranye": "#FB8C00",
+    "kuning": "#FDD835",
+    "hijau":  "#43A047",
+    "biru":   "#1E88E5",
+    "ungu":   "#8E24AA",
 }
 WARNA_TXT = {
     "putih":"#333","hitam":"#eee","abu":"#fff","merah":"#fff",
-    "pink":"#fff","oranye":"#fff","cokelat":"#fff",
-    "kuning":"#333","hijau":"#fff","biru":"#fff","ungu":"#fff"
+    "oranye":"#fff","kuning":"#333","hijau":"#fff","biru":"#fff","ungu":"#fff"
 }
-WARNA_ORDER = ["putih","oranye","cokelat","biru","merah","pink",
-               "hitam","kuning","ungu","hijau","abu"]
+WARNA_ORDER = ["putih","oranye","biru","merah","hitam","kuning","ungu","hijau","abu"]
 
 TYPEFACE_ID = {
     "humanist_serif":      "Humanist Serif",
@@ -150,7 +146,7 @@ GAYA_PROB_KEYS = ["photograph","hand_drawn","abstract","flat_graphic","text_domi
 SHELF_LABEL = {"fiksi":"Fiksi","puisi-asli":"Puisi"}
 
 GENRE_NORM = {
-     "Sastra":              "Sastra Indonesia",
+    "Sastra":              "Sastra Indonesia",
     "Cinta":               "Romansa",
     "Roman":               "Romansa",
     "Romansa Kontemporer": "Romansa",
@@ -158,20 +154,7 @@ GENRE_NORM = {
     "Thriller":            "Thriller/Misteri",
     "Misteri":             "Thriller/Misteri",
     "Misteri Thriller":    "Thriller/Misteri",
-    "Thriller Suspense":    "Thriller/Misteri",
-    "Psychological Thriller":    "Thriller/Misteri",
-    "Suspense":            "Thriller/Misteri",
-    "Detective":           "Thriller/Misteri",
-    "Kriminal":            "Thriller/Misteri",
-    "Supranatural":        "Horor",
     "Humor":               "Komedi",
-    "Romansatic":          "Romansa",
-    "Young Adult Romansace": "Romansa",
-    "New Adult":            "Remaja",
-    "Collections":           "Antologi",
-    "Middle Grade":         "Fantasi",
-    "Fiksi Ilmiah":        "Fiksi Sains",
-    "Distopia":            "Fiksi Sains",
     "Sejarah":             "Fiksi Sejarah",
     "Historical Fiction":  "Fiksi Sejarah",
     "Historical":          "Fiksi Sejarah",
@@ -221,10 +204,10 @@ KLASTER_COOC = [
         "short": "Klaster 3",
         "color": "#1D9E75",
         "bg":    "#EEF8F4",
-        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Sains",
+        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Ilmiah",
                    "Thriller/Misteri","Horor","Anak-anak","Fiksi Sejarah"],
         "pairs": [
-            ("Fantasi",       "Fiksi Sains"),
+            ("Fantasi",       "Fiksi Ilmiah"),
             ("Fantasi",       "Petualangan"),
             ("Aksi",          "Fantasi"),
             ("Aksi",          "Petualangan"),
@@ -263,51 +246,33 @@ def _reklasifikasi_warna(row):
         v = float(row.get("warna_v_1", 0) or 0)
     except Exception:
         return row.get("warna_kategori", "putih")
-    if v < 50:               return "hitam"
-    if s < 30 and v > 160:  return "putih"
-    if s < 50:               return "putih" if v > 160 else "abu"
-    # cokelat: hue oranye-merah, sangat gelap (V<120) — sepia, cokelat tua, kayu
-    if h < 25 and s > 80 and v < 120:
-        return "cokelat"
-    # pink: hue merah tapi terang dan saturasi rendah-sedang
-    if (h < 10 or h >= 160) and v > 160 and s < 160:
-        return "pink"
-    if h < 10 or h >= 170:  return "merah"
-    elif h < 25:             return "oranye"
-    elif h < 40:             return "kuning"
-    elif h < 85:             return "hijau"
-    elif h < 130:            return "biru"
-    elif h < 170:            return "ungu"
+    if v < 50: return "hitam"
+    if s < 30 and v > 160: return "putih"
+    if s < 50: return "putih" if v > 160 else "abu"
+    if h < 10 or h >= 170: return "merah"
+    elif h < 25: return "oranye"
+    elif h < 40: return "kuning"
+    elif h < 85: return "hijau"
+    elif h < 130: return "biru"
+    elif h < 170: return "ungu"
     return "merah"
 
 
 def _klasifikasi_hsv(h, s, v):
-    """
-    Klasifikasi satu warna dari nilai HSV (skala OpenCV: H 0-180, S 0-255, V 0-255).
-    11 kategori: putih, hitam, abu, merah, pink, oranye, cokelat, kuning, hijau, biru, ungu.
-    
-    Threshold cokelat: H<25, S>80, V<120 — hanya warna gelap (sepia, cokelat tua, kayu).
-    Threshold pink: H<10 atau H>=160, V>160, S<160 — merah muda cerah/pastel.
-    """
+    """Klasifikasi satu warna dari nilai HSV (skala OpenCV: H 0-180, S 0-255, V 0-255)."""
     try:
         h, s, v = float(h or 0), float(s or 0), float(v or 0)
     except Exception:
         return None
-    if v < 50:               return "hitam"
-    if s < 30 and v > 160:  return "putih"
-    if s < 50:               return "putih" if v > 160 else "abu"
-    # cokelat: hue oranye-merah, sangat gelap (V<120)
-    if h < 25 and s > 80 and v < 120:
-        return "cokelat"
-    # pink: hue merah tapi terang dan saturasi rendah-sedang
-    if (h < 10 or h >= 160) and v > 160 and s < 160:
-        return "pink"
-    if h < 10 or h >= 170:  return "merah"
-    elif h < 25:             return "oranye"
-    elif h < 40:             return "kuning"
-    elif h < 85:             return "hijau"
-    elif h < 130:            return "biru"
-    elif h < 170:            return "ungu"
+    if v < 50:              return "hitam"
+    if s < 30 and v > 160: return "putih"
+    if s < 50:             return "putih" if v > 160 else "abu"
+    if h < 10 or h >= 170: return "merah"
+    elif h < 25:            return "oranye"
+    elif h < 40:            return "kuning"
+    elif h < 85:            return "hijau"
+    elif h < 130:           return "biru"
+    elif h < 170:           return "ungu"
     return "merah"
 
 
@@ -832,119 +797,181 @@ def render_warna_legend(wc_series, is_proporsi=False):
 
 
 def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
-    """Buat matplotlib figure palet warna untuk genre terpilih — bisa disimpan."""
+    """
+    Buat matplotlib figure palet warna — layout dua kolom, compact, Word-friendly.
+    Ukuran 15×7 in → pas untuk A4 landscape dengan margin standar Word.
+    """
     plt.rcParams.update({
         "font.family": "DejaVu Sans",
         "figure.facecolor": "white",
-        "axes.facecolor": "white",
+        "axes.facecolor":   "white",
     })
+
     n = len(genres_sel)
     if n == 0:
         return None
+
     genre_lists = expand_genres(d["GENRES"], normalize=True)
-    # kumpulkan data warna per genre — gunakan distribusi keseluruhan
     palette_data = {}
     for g in genres_sel:
         mask = [g in gl for gl in genre_lists]
         sub  = d[mask]
         if sub.empty:
             continue
-        wc    = compute_warna_distribusi(sub)  # proporsi 0..1
-        items = [(w, wc.get(w, 0) * 100)
-                 for w in WARNA_ORDER if wc.get(w, 0) > 0]
+        wc    = compute_warna_distribusi(sub)
+        items = [(w, wc.get(w, 0) * 100) for w in WARNA_ORDER if wc.get(w, 0) > 0]
         items.sort(key=lambda x: -x[1])
         palette_data[g] = {"items": items, "n_buku": len(sub)}
 
     if not palette_data:
         return None
 
-    BAR_H   = 0.55   # tinggi bar per genre (axis unit)
-    GAP     = 0.45   # jarak antar genre
-    ROW     = BAR_H + GAP
-    fig_h_dyn = max(fig_h, n * ROW * 0.9 + 1.5)
+    # Warna hex dan teks — ikut WARNA_HEX global (sudah 11 kategori)
+    WARNA_HEX_LOCAL = dict(WARNA_HEX)
+    WARNA_TXT_LOCAL = dict(WARNA_TXT)
 
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h_dyn))
+    # ── Dimensi layout dua kolom ─────────────────────────────────────────────
+    N_COLS   = 2
+    n_rows   = (n + N_COLS - 1) // N_COLS
+
+    # Satuan axis (bukan inci)
+    COL_W    = 48.0      # lebar tiap kolom
+    COL_GAP  = 4.0       # gap antar kolom
+    BAR_H    = 0.38      # tinggi bar warna
+    LBL_H    = 0.28      # tinggi label genre di atas bar
+    LEG_H    = 0.24      # tinggi legend dot di bawah bar
+    ROW_GAP  = 0.22      # jarak antar baris genre
+    ROW      = BAR_H + LBL_H + LEG_H + ROW_GAP
+
+    # Tinggi figure dalam inci: proporsional, min 4.5, max 13
+    H_PER_ROW = 0.75
+    fig_h_dyn = max(4.5, min(13.0, n_rows * H_PER_ROW + 0.9))
+    fig_w_use = 15.0     # lebar tetap 15 in = Word A4 landscape siap pakai
+
+    AX_H = n_rows * ROW + 0.45
+    AX_W = N_COLS * COL_W + (N_COLS - 1) * COL_GAP
+
+    fig, ax = plt.subplots(figsize=(fig_w_use, fig_h_dyn))
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
-    ax.set_xlim(0, 100)
-    ax.set_ylim(-0.3, n * ROW + 0.8)
+    ax.set_xlim(0, AX_W)
+    ax.set_ylim(-0.40, AX_H + 0.60)
     ax.axis("off")
 
-    ax.text(50, n * ROW + 0.55, "Palet Warna per Genre",
-            ha="center", va="bottom", fontsize=14, fontweight="bold", color="#1A1A1A")
-    ax.text(50, n * ROW + 0.25, "Komposisi warna dominan sampul buku sastra Indonesia 2000–2025",
-            ha="center", va="bottom", fontsize=8.5, color="#888")
+    # ── Header ──────────────────────────────────────────────────────────────
+    ax.text(AX_W / 2, AX_H + 0.50,
+            "Palet Warna per Genre",
+            ha="center", va="bottom", fontsize=13, fontweight="bold", color="#1A1A1A")
+    ax.text(AX_W / 2, AX_H + 0.24,
+            "Komposisi warna dominan sampul buku sastra Indonesia 2000–2025",
+            ha="center", va="bottom", fontsize=8, color="#888")
 
-    WARNA_HEX_LOCAL = {
-        "putih": "#F5F5F0", "hitam": "#1A1A1A", "abu": "#8E8E93",
-        "merah": "#E53935", "oranye": "#FB8C00", "kuning": "#FDD835",
-        "hijau": "#43A047", "biru": "#1E88E5", "ungu": "#8E24AA",
-    }
-    WARNA_TXT_LOCAL = {
-        "putih": "#333", "hitam": "#eee", "abu": "#fff", "merah": "#fff",
-        "oranye": "#fff", "kuning": "#333", "hijau": "#fff", "biru": "#fff", "ungu": "#fff",
-    }
+    genres_list = list(palette_data.keys())
 
-    for gi, g in enumerate(reversed(list(palette_data.keys()))):
+    for idx, g in enumerate(genres_list):
+        col_i = idx % N_COLS
+        row_i = idx // N_COLS
+
+        # Posisi Y: baris 0 di atas, baris terakhir di bawah
+        y_top = AX_H - (row_i + 1) * ROW + ROW_GAP / 2
+        y_bar = y_top + LEG_H
+        x_off = col_i * (COL_W + COL_GAP)
+
         info   = palette_data[g]
         items  = info["items"]
         n_buku = info["n_buku"]
-        y_bar  = gi * ROW
 
-        kl = GENRE_KLASTER_MAP.get(g)
+        kl       = GENRE_KLASTER_MAP.get(g)
         kl_color = kl["color"] if kl else "#555"
+        kl_bg    = kl["bg"]    if kl else "#f5f5f5"
         kl_id    = f" [{kl['id']}]" if kl else ""
 
-        # genre label
-        ax.text(0, y_bar + BAR_H + 0.10,
+        # Label genre + background klaster (strip tipis)
+        ax.add_patch(mpatches.FancyBboxPatch(
+            (x_off - 0.3, y_bar + BAR_H + 0.01), COL_W + 0.6, LBL_H * 0.85,
+            boxstyle="square,pad=0",
+            facecolor=kl_bg, edgecolor="none", zorder=0, alpha=0.5,
+        ))
+        ax.text(x_off, y_bar + BAR_H + 0.05 + LBL_H * 0.42,
                 f"{g}{kl_id}",
-                ha="left", va="bottom", fontsize=9, fontweight="bold", color=kl_color)
-        ax.text(99.5, y_bar + BAR_H + 0.10,
-                f"{n_buku:,} buku",
-                ha="right", va="bottom", fontsize=7.5, color="#aaa")
+                ha="left", va="center", fontsize=8.5, fontweight="bold", color=kl_color, zorder=1)
+        ax.text(x_off + COL_W, y_bar + BAR_H + 0.05 + LBL_H * 0.42,
+                f"n={n_buku:,}",
+                ha="right", va="center", fontsize=7, color="#aaa", zorder=1)
 
-        # bar segments
-        cx = 0.0
+        # ── Bar segmen warna ──────────────────────────────────────────────
+        cx = x_off
         total_pct = sum(p for _, p in items)
         for wname, pct in items:
-            seg_w = pct / total_pct * 100 if total_pct > 0 else 0
-            ec    = "#ccc" if wname == "putih" else WARNA_HEX_LOCAL.get(wname, "#999")
-            rect  = mpatches.FancyBboxPatch(
-                (cx, y_bar), seg_w - 0.15, BAR_H,
+            seg_w = pct / total_pct * COL_W if total_pct > 0 else 0
+            if seg_w < 0.05:
+                continue
+            face_c = WARNA_HEX_LOCAL.get(wname, "#ccc")
+            ec     = "#bbb" if wname == "putih" else face_c
+            rect   = mpatches.FancyBboxPatch(
+                (cx, y_bar), seg_w - 0.10, BAR_H,
                 boxstyle="square,pad=0",
-                facecolor=WARNA_HEX_LOCAL.get(wname, "#ccc"),
-                edgecolor=ec, linewidth=0.3,
+                facecolor=face_c, edgecolor=ec, linewidth=0.25, zorder=2,
             )
             ax.add_patch(rect)
-            if seg_w > 6:
+            # Label % di dalam bar jika cukup lebar
+            if seg_w > COL_W * 0.075:
                 txt_c = WARNA_TXT_LOCAL.get(wname, "#333")
                 ax.text(cx + seg_w / 2, y_bar + BAR_H / 2,
                         f"{pct:.0f}%",
                         ha="center", va="center",
-                        fontsize=7, color=txt_c, fontweight="bold")
+                        fontsize=6.5, color=txt_c, fontweight="bold", zorder=3)
             cx += seg_w
 
-        # legend dots underneath bar
-        lx = 0.0
-        for wname, pct in items[:6]:
-            hex_c = WARNA_HEX_LOCAL.get(wname, "#ccc")
-            ec    = "#bbb" if wname == "putih" else hex_c
-            dot   = mpatches.FancyBboxPatch(
-                (lx, y_bar - 0.30), 1.2, 0.22,
+        # ── Legend dots bawah bar — max 5 item ───────────────────────────
+        slot_w = COL_W / 5      # lebar per slot legend
+        for li, (wname, pct) in enumerate(items[:5]):
+            lx_dot = x_off + li * slot_w
+            face_c = WARNA_HEX_LOCAL.get(wname, "#ccc")
+            ec     = "#bbb" if wname == "putih" else face_c
+            dot    = mpatches.FancyBboxPatch(
+                (lx_dot, y_top + 0.03), 0.85, LEG_H * 0.65,
                 boxstyle="square,pad=0",
-                facecolor=hex_c, edgecolor=ec, linewidth=0.25,
+                facecolor=face_c, edgecolor=ec, linewidth=0.18, zorder=2,
             )
             ax.add_patch(dot)
-            ax.text(lx + 1.5, y_bar - 0.19,
+            ax.text(lx_dot + 1.05, y_top + LEG_H * 0.36,
                     f"{wname} {pct:.0f}%",
-                    ha="left", va="center", fontsize=6.5, color="#555")
-            lx += 15.5
+                    ha="left", va="center", fontsize=5.8, color="#555", zorder=3)
 
-    ax.text(50, -0.20,
+        # Garis pemisah horizontal antar baris (di antara baris, bukan di dalam kolom)
+        if col_i == N_COLS - 1 and row_i < n_rows - 1:
+            sep_y = y_top - ROW_GAP * 0.5
+            ax.axhline(sep_y, xmin=0, xmax=1,
+                       color="#e0e0e0", linewidth=0.5, linestyle="-", zorder=0)
+
+    # Garis pemisah vertikal antara dua kolom
+    mid_x = COL_W + COL_GAP / 2
+    ax.axvline(mid_x, ymin=0.02, ymax=0.98,
+               color="#e0e0e0", linewidth=0.5, linestyle="--", zorder=0)
+
+    # ── Legenda klaster di bawah ─────────────────────────────────────────
+    kl_y = -0.30
+    kl_x = 0.0
+    for kl_info in KLASTER_COOC:
+        dot_kl = mpatches.FancyBboxPatch(
+            (kl_x, kl_y), 1.0, 0.18,
+            boxstyle="square,pad=0",
+            facecolor=kl_info["color"], edgecolor="none",
+        )
+        ax.add_patch(dot_kl)
+        short_label = kl_info["label"].split("—")[1].strip() if "—" in kl_info["label"] else kl_info["short"]
+        ax.text(kl_x + 1.3, kl_y + 0.09,
+                f'[{kl_info["id"]}] {short_label}',
+                ha="left", va="center", fontsize=6.5, color=kl_info["color"])
+        kl_x += AX_W / len(KLASTER_COOC)
+
+    # ── Footer ──────────────────────────────────────────────────────────────
+    ax.text(AX_W / 2, -0.36,
             "Sumber: Kartografi Sampul Sastra Indonesia 2000–2025  ·  Metode: K-Means HSV (k=5)",
-            ha="center", va="top", fontsize=7, color="#bbb")
+            ha="center", va="top", fontsize=6.5, color="#bbb")
 
-    fig.tight_layout(pad=0.5)
+    fig.tight_layout(pad=0.35)
     return fig
 
 
