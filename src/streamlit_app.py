@@ -60,7 +60,7 @@ WARNA_HEX = {
     "hitam":      "#1A1A1A",
     "abu":        "#8E8E93",
     "merah":      "#E53935",
-    "merah_muda": "#F06292",
+    "pink": "#F06292",
     "oranye":     "#FB8C00",
     "cokelat":    "#795548",
     "kuning":     "#FDD835",
@@ -73,7 +73,7 @@ WARNA_TXT = {
     "hitam":      "#eee",
     "abu":        "#fff",
     "merah":      "#fff",
-    "merah_muda": "#fff",
+    "pink": "#fff",
     "oranye":     "#fff",
     "cokelat":    "#fff",
     "kuning":     "#333",
@@ -82,7 +82,7 @@ WARNA_TXT = {
     "ungu":       "#fff",
 }
 WARNA_ORDER = [
-    "putih", "oranye", "cokelat", "biru", "merah", "merah_muda",
+    "putih", "oranye", "cokelat", "biru", "merah", "pink",
     "hitam", "kuning", "ungu", "hijau", "abu"
 ]
 
@@ -268,11 +268,11 @@ DATA_PATH = _v2_path if os.path.exists(_v2_path) else _v1_path
 COVER_DIR = os.path.join(os.path.dirname(__file__), "..", "covers")
 
 
-# ── KLASIFIKASI WARNA (11 kategori, termasuk cokelat & merah_muda) ────────────
+# ── KLASIFIKASI WARNA (11 kategori, termasuk cokelat & pink) ────────────
 def _klasifikasi_hsv(h, s, v):
     """
     Klasifikasi warna dari HSV OpenCV (H 0-180, S 0-255, V 0-255).
-    cokelat & merah_muda dicek lebih dulu sebelum jalur generik.
+    cokelat & pink dicek lebih dulu sebelum jalur generik.
     """
     try:
         h, s, v = float(h or 0), float(s or 0), float(v or 0)
@@ -287,7 +287,7 @@ def _klasifikasi_hsv(h, s, v):
         return "cokelat"
     # Merah muda / pink: hue merah atau magenta, terang, saturasi sedang
     if (h < 10 or h >= 155) and v > 160 and s < 170:
-        return "merah_muda"
+        return "pink"
     # Chromatic
     if h < 10 or h >= 170:  return "merah"
     elif h < 25:             return "oranye"
@@ -1320,7 +1320,7 @@ elif HAL == "Warna":
         )
         hue_info = [
             ("merah",      "0–10° & 330°+"),
-            ("merah_muda", "0–10°, V>160, S<170"),
+            ("pink", "0–10°, V>160, S<170"),
             ("oranye",     "10–25°, V≥130"),
             ("cokelat",    "10–25°, V<130, S>80"),
             ("kuning",     "25–40°"),
