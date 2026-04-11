@@ -147,7 +147,6 @@ SHELF_LABEL = {"fiksi":"Fiksi","puisi-asli":"Puisi"}
 
 GENRE_NORM = {
     "Sastra":              "Sastra Indonesia",
-    "Literary Fiction":    "Sastra indonesia",
     "Cinta":               "Romansa",
     "Roman":               "Romansa",
     "Romansa Kontemporer": "Romansa",
