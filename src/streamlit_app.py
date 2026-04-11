@@ -167,7 +167,7 @@ GENRE_NORM = {
     "Collections":           "Antologi",
     "Middle Grade":         "Fantasi",
     "Distopia":            "Fiksi Sains",
-    "Fiksi Ilmiah":         "Fiksi Sains".
+    "Fiksi Ilmiah":         "Fiksi Sains",
     "Sejarah":             "Fiksi Sejarah",
     "Historical Fiction":  "Fiksi Sejarah",
     "Historical":          "Fiksi Sejarah",
