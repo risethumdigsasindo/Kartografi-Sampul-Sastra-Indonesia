@@ -1006,7 +1006,7 @@ def render_brightness_saturation_section(d, top_n=18):
         )
         df_hm = df_plot.set_index("label_y")[["brightness", "saturation"]].T
         df_hm.index = ["Kecerahan (V)", "Saturasi (S)"]
-        text_hm = df_hm.applymap(lambda v: f"{v:.3f}" if not np.isnan(v) else "–")
+        text_hm = df_hm.map(lambda v: f"{v:.3f}" if (isinstance(v, float) and not np.isnan(v)) else "–")
         fig_hm = go.Figure(data=go.Heatmap(
             z=df_hm.values,
             x=df_hm.columns.tolist(),
