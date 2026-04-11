@@ -166,6 +166,7 @@ GENRE_NORM = {
     "New Adult":            "Remaja",
     "Collections":           "Antologi",
     "Middle Grade":         "Fantasi",
+    "Fiksi Ilmiah":        "Fiksi Sains",
     "Distopia":            "Fiksi Sains",
     "Sejarah":             "Fiksi Sejarah",
     "Historical Fiction":  "Fiksi Sejarah",
