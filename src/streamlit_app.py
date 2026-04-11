@@ -154,6 +154,8 @@ GENRE_NORM = {
     "Thriller":            "Thriller/Misteri",
     "Misteri":             "Thriller/Misteri",
     "Misteri Thriller":    "Thriller/Misteri",
+    "Thriller Suspense":    "Thriller/Misteri",
+    "Psychological Thriller":    "Thriller/Misteri",
     "Humor":               "Komedi",
     "Sejarah":             "Fiksi Sejarah",
     "Historical Fiction":  "Fiksi Sejarah",
