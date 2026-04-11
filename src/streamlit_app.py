@@ -146,7 +146,7 @@ GAYA_PROB_KEYS = ["photograph","hand_drawn","abstract","flat_graphic","text_domi
 SHELF_LABEL = {"fiksi":"Fiksi","puisi-asli":"Puisi"}
 
 GENRE_NORM = {
-    "Sastra":              "Sastra Indonesia",
+ "Sastra":              "Sastra Indonesia",
     "Cinta":               "Romansa",
     "Roman":               "Romansa",
     "Romansa Kontemporer": "Romansa",
@@ -154,14 +154,27 @@ GENRE_NORM = {
     "Thriller":            "Thriller/Misteri",
     "Misteri":             "Thriller/Misteri",
     "Misteri Thriller":    "Thriller/Misteri",
+    "Thriller Suspense":    "Thriller/Misteri",
+    "Psychological Thriller":    "Thriller/Misteri",
+    "Suspense":            "Thriller/Misteri",
+    "Detective":           "Thriller/Misteri",
+    "Kriminal":            "Thriller/Misteri",
+    "Supranatural":        "Horor",
     "Humor":               "Komedi",
+    "Romansatic":          "Romansa",
+    "Young Adult Romansace": "Romansa",
+    "New Adult":            "Remaja",
+    "Collections":           "Antologi",
+    "Middle Grade":         "Fantasi",
+    "Distopia":            "Fiksi Sains",
+    "Fiksi Ilmiah":         "Fiksi Sains".
     "Sejarah":             "Fiksi Sejarah",
     "Historical Fiction":  "Fiksi Sejarah",
     "Historical":          "Fiksi Sejarah",
 }
 _NONFICTION_LOWER = {"nonfiction","non-fiction","nonfiksi","non fiksi","non-fiksi","nonfiction (general)"}
 GENRE_EXCLUDE = {"Sastra Indonesia", "Sastra", "Fiksi", "Nonfiction", "Non-fiction",
-                 "Nonfiksi", "Non Fiksi", "Non-fiksi"}
+                 "Nonfiksi", "Non Fiksi", "Non-fiksi","Literary Fiction"}
 
 # ── Tiga klaster co-occurrence ───────────────────────────────────────────────
 KLASTER_COOC = [
@@ -204,10 +217,10 @@ KLASTER_COOC = [
         "short": "Klaster 3",
         "color": "#1D9E75",
         "bg":    "#EEF8F4",
-        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Ilmiah",
+        "genres": ["Fantasi","Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Sains",
                    "Thriller/Misteri","Horor","Anak-anak","Fiksi Sejarah"],
         "pairs": [
-            ("Fantasi",       "Fiksi Ilmiah"),
+            ("Fantasi",       "Fiksi Sains"),
             ("Fantasi",       "Petualangan"),
             ("Aksi",          "Fantasi"),
             ("Aksi",          "Petualangan"),
