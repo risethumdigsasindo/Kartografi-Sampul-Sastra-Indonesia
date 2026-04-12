@@ -9,6 +9,51 @@ Dependensi: semua konstanta dan fungsi yang sudah ada di app utama
 (GAYA_CLR, GAYA_ID, GAYA_ICON, cover_path, expand_genres, genre_map, dsb.)
 """
 
+import streamlit as st
+import pandas as pd
+
+# Konstanta diimpor dari app utama via wildcard — pastikan file ini
+# diletakkan di folder yang sama dengan streamlit_app.py dan diimpor
+# setelah konstanta didefinisikan. Atau definisikan ulang di sini
+# jika perlu berdiri sendiri.
+try:
+    # Jika diimpor dari app utama, konstanta sudah tersedia di namespace global
+    _ = GAYA_CLR
+except NameError:
+    # Fallback: definisi minimal agar tidak error saat diimpor mandiri
+    GAYA_CLR  = {
+        "photograph":    "#1E88E5",
+        "flat_graphic":  "#43A047",
+        "hand_drawn":    "#FB8C00",
+        "text_dominant": "#E53935",
+        "abstract":      "#8E24AA",
+        "collage":       "#00ACC1",
+    }
+    GAYA_ID   = {
+        "photograph":    "Fotografi",
+        "flat_graphic":  "Ilustrasi Datar",
+        "hand_drawn":    "Gambar Tangan",
+        "text_dominant": "Dominan Teks",
+        "abstract":      "Abstrak",
+        "collage":       "Kolase",
+    }
+    GAYA_ICON = {
+        "photograph":    "📷",
+        "flat_graphic":  "🎨",
+        "hand_drawn":    "✏️",
+        "text_dominant": "🔤",
+        "abstract":      "🔷",
+        "collage":       "🗂️",
+    }
+
+    def cover_path(img):
+        import os
+        COVER_DIR = os.path.join(os.path.dirname(__file__), "..", "covers")
+        if not img or str(img) in ("", "nan"):
+            return None
+        p = os.path.join(COVER_DIR, str(img))
+        return p if os.path.exists(p) else None
+
 # ──────────────────────────────────────────────────────────────────────────────
 # HELPER: ambil top-N buku per genre+style berdasarkan confidence
 # ──────────────────────────────────────────────────────────────────────────────
