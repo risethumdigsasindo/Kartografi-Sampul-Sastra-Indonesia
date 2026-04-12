@@ -60,7 +60,7 @@ WARNA_HEX = {
     "hitam":      "#1A1A1A",
     "abu":        "#8E8E93",
     "merah":      "#E53935",
-    "pink": "#F06292",
+    "pink":       "#F06292",
     "oranye":     "#FB8C00",
     "cokelat":    "#795548",
     "kuning":     "#FDD835",
@@ -73,7 +73,7 @@ WARNA_TXT = {
     "hitam":      "#eee",
     "abu":        "#fff",
     "merah":      "#fff",
-    "pink": "#fff",
+    "pink":       "#fff",
     "oranye":     "#fff",
     "cokelat":    "#fff",
     "kuning":     "#333",
@@ -268,27 +268,19 @@ DATA_PATH = _v2_path if os.path.exists(_v2_path) else _v1_path
 COVER_DIR = os.path.join(os.path.dirname(__file__), "..", "covers")
 
 
-# ── KLASIFIKASI WARNA (11 kategori, termasuk cokelat & pink) ────────────
+# ── KLASIFIKASI WARNA ────────────────────────────────────────────────────────
 def _klasifikasi_hsv(h, s, v):
-    """
-    Klasifikasi warna dari HSV OpenCV (H 0-180, S 0-255, V 0-255).
-    cokelat & pink dicek lebih dulu sebelum jalur generik.
-    """
     try:
         h, s, v = float(h or 0), float(s or 0), float(v or 0)
     except Exception:
         return None
-    # Achromatic
     if v < 50:              return "hitam"
     if s < 30 and v > 160: return "putih"
     if s < 50:             return "putih" if v > 160 else "abu"
-    # Cokelat: hue oranye-kemerahan tapi gelap
     if h < 25 and v < 130 and s > 80:
         return "cokelat"
-    # Merah muda / pink: hue merah atau magenta, terang, saturasi sedang
     if (h < 10 or h >= 155) and v > 160 and s < 170:
         return "pink"
-    # Chromatic
     if h < 10 or h >= 170:  return "merah"
     elif h < 25:             return "oranye"
     elif h < 40:             return "kuning"
@@ -309,10 +301,6 @@ def _reklasifikasi_warna(row):
 
 
 def compute_warna_distribusi(d):
-    """
-    Distribusi warna berbobot dari semua klaster tiap sampul (bukan hanya dominan).
-    Returns pd.Series index=nama_warna, values=proporsi (sum=1).
-    """
     acc = {w: 0.0 for w in WARNA_ORDER}
     for _, row in d.iterrows():
         for i in range(1, 6):
@@ -813,17 +801,7 @@ def render_warna_legend(wc_series, is_proporsi=False):
                 )
 
 
-# ── PALETTE FIGURE (Word-ready, tanpa tumpang tindih) ────────────────────────
 def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
-    """
-    Palet warna per genre untuk diunduh — Word-ready.
-
-    Layout:
-    - 2 kolom, n baris sesuai jumlah genre
-    - Setiap blok genre: label atas + bar warna + legend 2 baris × 3 kolom
-    - Tinggi figure dihitung otomatis (1.1 in/baris)
-    - Tidak ada tumpang tindih pada jumlah genre berapapun
-    """
     plt.rcParams.update({
         "font.family": "DejaVu Sans",
         "figure.facecolor": "white",
@@ -847,19 +825,18 @@ def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
     if not palette_data:
         return None
 
-    # ── Dimensi layout ───────────────────────────────────────────────────────
     N_COLS     = 2
     n_real     = len(palette_data)
     n_rows     = (n_real + N_COLS - 1) // N_COLS
 
-    COL_W      = 46.0   # lebar kolom (axis units)
-    COL_GAP    = 8.0    # gap antar kolom
-    BAR_H      = 0.44   # tinggi bar warna
-    LBL_H      = 0.34   # tinggi area label genre
-    LEG_ROW_H  = 0.23   # tinggi satu baris legend
-    N_LEG_ROWS = 2      # 2 baris × 3 item = 6 item legend
+    COL_W      = 46.0
+    COL_GAP    = 8.0
+    BAR_H      = 0.44
+    LBL_H      = 0.34
+    LEG_ROW_H  = 0.23
+    N_LEG_ROWS = 2
     LEG_H      = N_LEG_ROWS * LEG_ROW_H + 0.10
-    ROW_GAP    = 0.35   # jarak antar genre
+    ROW_GAP    = 0.35
     ROW        = LBL_H + BAR_H + LEG_H + ROW_GAP
 
     AX_H = n_rows * ROW + 0.65
@@ -875,7 +852,6 @@ def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
     ax.set_ylim(-0.60, AX_H + 0.80)
     ax.axis("off")
 
-    # Header
     ax.text(AX_W / 2, AX_H + 0.65,
             "Palet Warna per Genre",
             ha="center", va="bottom", fontsize=13, fontweight="bold", color="#1A1A1A")
@@ -902,7 +878,6 @@ def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
         kl_bg    = kl["bg"]    if kl else "#F5F5F5"
         kl_id    = f" [{kl['id']}]" if kl else ""
 
-        # Label strip klaster
         ax.add_patch(mpatches.FancyBboxPatch(
             (x_off - 0.2, y_bar_bot + BAR_H + 0.02), COL_W + 0.4, LBL_H * 0.88,
             boxstyle="square,pad=0",
@@ -914,7 +889,6 @@ def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
         ax.text(x_off + COL_W, y_lbl_ctr, f"n={n_buku:,}",
                 ha="right", va="center", fontsize=7, color="#aaaaaa", zorder=1)
 
-        # Bar segmen
         cx = x_off
         total_pct = sum(p for _, p in items)
         for wname, pct in items:
@@ -935,7 +909,6 @@ def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
                         fontsize=6.5, color=txt_c, fontweight="bold", zorder=3)
             cx += seg_w
 
-        # Legend 2 baris × 3 kolom (max 6 item)
         slot_w = COL_W / 3
         for li, (wname, pct) in enumerate(items[:6]):
             leg_row = li // 3
@@ -954,17 +927,14 @@ def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
                     f"{display_name} {pct:.0f}%",
                     ha="left", va="center", fontsize=5.9, color="#444444", zorder=3)
 
-        # Garis pemisah antar baris
         if col_i == N_COLS - 1 and row_i < n_rows - 1:
             sep_y = y_block_top - ROW_GAP * 0.28
             ax.axhline(sep_y, xmin=0.01, xmax=0.99,
                        color="#e4e4e4", linewidth=0.55, zorder=0)
 
-    # Garis pemisah kolom
     ax.axvline(COL_W + COL_GAP / 2, ymin=0.03, ymax=0.97,
                color="#dedede", linewidth=0.6, linestyle="--", zorder=0)
 
-    # Legenda klaster
     kl_step = AX_W / len(KLASTER_COOC)
     kl_x = 0.0
     for kl_info in KLASTER_COOC:
@@ -979,7 +949,6 @@ def _build_palette_figure(d, genres_sel, fig_w=15, fig_h=7):
                 ha="left", va="center", fontsize=6.5, color=kl_info["color"])
         kl_x += kl_step
 
-    # Footer
     ax.text(AX_W / 2, -0.56,
             "Sumber: Kartografi Sampul Sastra Indonesia 2000–2025  ·  Metode: K-Means HSV (k=5)",
             ha="center", va="top", fontsize=6.5, color="#bbbbbb")
@@ -1194,6 +1163,498 @@ def render_klaster_visual(d, analysis_type="warna"):
                     st.plotly_chart(fig2, use_container_width=True)
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# CONFIDENCE ILLUSTRATION FUNCTIONS (BARU)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _yolo_info(row):
+    """Kembalikan dict info YOLO + DETR untuk satu buku."""
+    ada_manusia = str(row.get("yolo_ada_manusia", "")).upper() == "TRUE"
+    detr_manusia = str(row.get("detr_ada_manusia", "")).upper() == "TRUE"
+    n_objek = row.get("yolo_n_objek", 0)
+    try:
+        n_objek = int(float(n_objek))
+    except Exception:
+        n_objek = 0
+    objek_str = str(row.get("yolo_objek", "") or "")
+    objek_list = [o.strip() for o in objek_str.split(",")
+                  if o.strip() and o.strip() not in ("0", "nan")]
+    return {
+        "ada_manusia": ada_manusia,
+        "detr_manusia": detr_manusia,
+        "n_objek": n_objek,
+        "objek_list": objek_list[:8],
+    }
+
+
+def _render_confidence_card(row, label_top="", label_top_color="#333",
+                             badge_text="", badge_bg="#eee", badge_fg="#333"):
+    """
+    Render satu kartu buku confidence:
+    - Sampul
+    - Badge confidence
+    - Info buku
+    - Box YOLO (figur manusia + objek terdeteksi)
+    - Bar distribusi probabilitas gaya visual
+    """
+    cp = cover_path(row.get("IMAGE_FILE"))
+    if cp:
+        st.image(cp, use_container_width=True)
+    else:
+        st.markdown(
+            '<div style="height:150px;background:rgba(128,128,128,.08);border-radius:8px 8px 0 0;'
+            'display:flex;align-items:center;justify-content:center;font-size:2rem;">📖</div>',
+            unsafe_allow_html=True
+        )
+
+    # Metadata gaya
+    try:
+        skor = float(row.get("gaya_skor", 0))
+        skor_str = f"{skor:.3f}"
+    except Exception:
+        skor_str = "–"
+
+    gaya_key = str(row.get("gaya_ilustrasi", ""))
+    gaya_label = GAYA_ID.get(gaya_key, gaya_key)
+    gaya_clr = GAYA_CLR.get(gaya_key, "#999")
+    gaya_icon = GAYA_ICON.get(gaya_key, "")
+
+    year = int(row["YEAR"]) if row.get("YEAR", 0) and int(row.get("YEAR", 0)) > 0 else "–"
+    url = str(row.get("URL", "") or "")
+    title = str(row.get("TITLE", "–"))
+    title_html = (
+        f'<a href="{url}" target="_blank" style="text-decoration:none;color:inherit;">{title}</a>'
+        if url else title
+    )
+
+    # Label confidence
+    conf_label_html = ""
+    if label_top:
+        conf_label_html = (
+            f'<div style="font-size:.58rem;font-weight:700;color:{label_top_color};'
+            f'letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px;">'
+            f'{label_top}</div>'
+        )
+
+    # Badge rank
+    badge_html = ""
+    if badge_text:
+        badge_html = (
+            f'<span style="display:inline-block;background:{badge_bg};color:{badge_fg};'
+            f'border-radius:10px;padding:1px 8px;font-size:.63rem;font-weight:700;'
+            f'margin-bottom:3px;">{badge_text}</span> '
+        )
+
+    # YOLO box
+    yolo = _yolo_info(row)
+    figur_src = []
+    if yolo["ada_manusia"]: figur_src.append("YOLO")
+    if yolo["detr_manusia"]: figur_src.append("DETR")
+
+    if figur_src:
+        figur_html = (
+            f'<span style="background:#E3F2FD;color:#1565C0;border-radius:8px;'
+            f'padding:1px 6px;font-size:.58rem;font-weight:600;">'
+            f'👤 Manusia ({", ".join(figur_src)})</span>'
+        )
+    else:
+        figur_html = (
+            '<span style="background:#F5F5F5;color:#999;border-radius:8px;'
+            'padding:1px 6px;font-size:.58rem;">'
+            '— Non-manusia</span>'
+        )
+
+    obj_tags_html = ""
+    if yolo["objek_list"]:
+        tags = "".join(
+            f'<span style="background:#FAFAFA;color:#666;border:1px solid #E8E8E8;'
+            f'border-radius:6px;padding:0px 5px;font-size:.55rem;margin:1px 2px 0 0;">{o}</span>'
+            for o in yolo["objek_list"]
+        )
+        obj_tags_html = f'<div style="margin-top:2px;line-height:2.0">{tags}</div>'
+
+    yolo_box_html = (
+        f'<div style="margin-top:5px;padding:4px 6px;background:rgba(128,128,128,.04);'
+        f'border:1px solid rgba(128,128,128,.1);border-radius:6px;">'
+        f'<div style="font-size:.58rem;font-weight:600;opacity:.5;letter-spacing:.05em;'
+        f'text-transform:uppercase;margin-bottom:3px;">Deteksi Objek (YOLO + DETR)</div>'
+        f'{figur_html}'
+        f'{obj_tags_html}'
+        f'</div>'
+    )
+
+    # Prob bars gaya visual
+    probs = {k: float(row.get(f"gaya_prob_{k}", 0) or 0) for k in GAYA_PROB_KEYS}
+    prob_html = ""
+    if any(probs.values()):
+        sorted_probs = sorted(probs.items(), key=lambda x: -x[1])
+        bars_inner = ""
+        for k, v in sorted_probs:
+            lbl = GAYA_ID.get(k, k)
+            clr = GAYA_CLR.get(k, "#999")
+            pct = v * 100
+            is_top = k == gaya_key
+            highlight = f"box-shadow:0 0 0 1.5px {gaya_clr};" if is_top else ""
+            fw = "font-weight:700;" if is_top else ""
+            bars_inner += (
+                f'<div style="margin-bottom:3px;">'
+                f'<div style="display:flex;justify-content:space-between;'
+                f'font-size:.57rem;color:#666;margin-bottom:1px;">'
+                f'<span style="{fw}">{lbl}</span>'
+                f'<span style="{fw}color:{clr}">{pct:.1f}%</span></div>'
+                f'<div style="background:rgba(128,128,128,.1);border-radius:3px;'
+                f'height:5px;overflow:hidden;{highlight}">'
+                f'<div style="width:{pct:.1f}%;background:{clr};height:5px;border-radius:3px;"></div>'
+                f'</div></div>'
+            )
+        prob_html = (
+            f'<div style="margin-top:5px;padding:4px 6px;'
+            f'background:rgba(128,128,128,.04);border:1px solid rgba(128,128,128,.1);'
+            f'border-radius:6px;">'
+            f'<div style="font-size:.58rem;font-weight:600;opacity:.5;letter-spacing:.05em;'
+            f'text-transform:uppercase;margin-bottom:4px;">Distribusi Gaya Visual</div>'
+            f'{bars_inner}</div>'
+        )
+
+    st.markdown(
+        f'<div style="padding:.4rem .45rem .6rem;border:1px solid rgba(128,128,128,.1);'
+        f'border-top:3px solid {gaya_clr};border-radius:0 0 8px 8px;">'
+        f'{conf_label_html}'
+        f'{badge_html}'
+        f'<span style="display:inline-block;background:{gaya_clr}18;color:{gaya_clr};'
+        f'border-radius:6px;padding:1px 6px;font-size:.6rem;font-weight:600;margin-bottom:3px;">'
+        f'{gaya_icon} {gaya_label} · {skor_str}</span>'
+        f'<div style="font-family:\'Lora\',serif;font-size:.76rem;font-weight:600;'
+        f'line-height:1.3;margin:.2rem 0 .1rem;">{title_html}</div>'
+        f'<div style="font-size:.65rem;color:#999;margin-bottom:.2rem;">'
+        f'{row.get("AUTHOR", "–")} · {year}</div>'
+        f'{yolo_box_html}'
+        f'{prob_html}'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+
+
+def render_confidence_by_genre(d):
+    """
+    Visualisasi confidence tertinggi & terendah per genre × gaya ilustrasi.
+    Layout: mirip palet warna per genre, header genre → sub-section per gaya.
+    """
+    if "gaya_ilustrasi" not in d.columns or "gaya_skor" not in d.columns:
+        st.info("Kolom gaya_ilustrasi atau gaya_skor tidak ditemukan.")
+        return
+
+    d_valid = d[
+        d["gaya_ilustrasi"].notna() &
+        d["image_ok"].astype(str).str.upper().isin(["TRUE", "1"])
+    ].copy()
+    d_valid["gaya_skor"] = pd.to_numeric(d_valid["gaya_skor"], errors="coerce")
+    d_valid = d_valid.dropna(subset=["gaya_skor"])
+
+    if d_valid.empty:
+        st.info("Tidak ada data ilustrasi yang valid.")
+        return
+
+    gc = genre_counts(d_valid, normalize=True)
+    all_genres = [g for g, cnt in gc.most_common() if g not in GENRE_EXCLUDE and cnt >= 5]
+
+    genre_labels = {
+        g: (f"[{GENRE_KLASTER_MAP[g]['id']}] {g}" if g in GENRE_KLASTER_MAP else g)
+        for g in all_genres
+    }
+    label_to_genre = {v: k for k, v in genre_labels.items()}
+
+    sel_col1, sel_col2 = st.columns([3, 1])
+    with sel_col1:
+        sel_labels = st.multiselect(
+            "Pilih genre",
+            options=[genre_labels[g] for g in all_genres],
+            default=[genre_labels[g] for g in all_genres[:5]],
+            key="conf_genre_sel"
+        )
+    with sel_col2:
+        n_sample = st.selectbox(
+            "Sampel per sisi", [1, 2, 3], index=0,
+            key="conf_genre_n",
+            help="Jumlah buku confidence tertinggi & terendah per kombinasi genre × gaya"
+        )
+
+    genres_sel = [label_to_genre[lbl] for lbl in sel_labels if lbl in label_to_genre]
+    if not genres_sel:
+        st.caption("Pilih minimal satu genre.")
+        return
+
+    genre_lists = expand_genres(d_valid["GENRES"], normalize=True)
+
+    for g in genres_sel:
+        mask = [g in gl for gl in genre_lists]
+        df_g = d_valid[mask].copy()
+        if df_g.empty:
+            continue
+
+        kl = GENRE_KLASTER_MAP.get(g)
+        kl_color = kl["color"] if kl else "#555"
+        kl_bg = kl["bg"] if kl else "#F5F5F5"
+        kl_id = f"[{kl['id']}]" if kl else ""
+
+        # Header genre
+        st.markdown(
+            f'<div style="background:{kl_bg};border-left:4px solid {kl_color};'
+            f'border-radius:0 8px 8px 0;padding:8px 14px;margin:1.2rem 0 .5rem;">'
+            f'<span style="font-family:\'Lora\',serif;font-weight:600;'
+            f'color:{kl_color};font-size:.95rem;">{g}</span>'
+            f'<span style="font-size:.7rem;color:{kl_color};opacity:.65;margin-left:8px;">'
+            f'{kl_id} — {len(df_g):,} buku teranalisis</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+
+        # Proporsi gaya dalam genre ini (mini bar horizontal)
+        gaya_vc = df_g["gaya_ilustrasi"].value_counts()
+        total_gaya = gaya_vc.sum()
+        bar_parts_gaya = ""
+        for gk_bar in GAYA_ID:
+            cnt_bar = gaya_vc.get(gk_bar, 0)
+            if cnt_bar == 0: continue
+            pct_bar = cnt_bar / total_gaya * 100
+            bc = GAYA_CLR.get(gk_bar, "#999")
+            bar_parts_gaya += (
+                f'<div style="background:{bc};width:{pct_bar:.1f}%;height:100%;'
+                f'display:flex;align-items:center;justify-content:center;" '
+                f'title="{GAYA_ID[gk_bar]}: {cnt_bar} ({pct_bar:.1f}%)">'
+                f'<span style="color:#fff;font-size:.52rem;font-weight:700;white-space:nowrap;">'
+                f'{"" if pct_bar < 10 else f"{pct_bar:.0f}%"}'
+                f'</span></div>'
+            )
+        st.markdown(
+            f'<div style="display:flex;height:16px;border-radius:4px;overflow:hidden;'
+            f'gap:1px;margin-bottom:.6rem;">{bar_parts_gaya}</div>',
+            unsafe_allow_html=True
+        )
+
+        # Per gaya
+        gaya_hadir = [k for k in GAYA_ID if k in gaya_vc.index]
+
+        for gaya_key in gaya_hadir:
+            df_gaya = df_g[df_g["gaya_ilustrasi"] == gaya_key].copy()
+            if len(df_gaya) < 2:
+                continue
+
+            gaya_label = GAYA_ID.get(gaya_key, gaya_key)
+            gaya_clr = GAYA_CLR.get(gaya_key, "#999")
+            gaya_icon = GAYA_ICON.get(gaya_key, "")
+            n_gaya = len(df_gaya)
+            mean_s = df_gaya["gaya_skor"].mean()
+
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:8px;margin:.4rem 0 .25rem;">'
+                f'<span style="width:8px;height:8px;border-radius:2px;'
+                f'background:{gaya_clr};display:inline-block;flex-shrink:0;"></span>'
+                f'<span style="font-size:.78rem;font-weight:600;color:{gaya_clr};">'
+                f'{gaya_icon} {gaya_label}</span>'
+                f'<span style="font-size:.65rem;color:#bbb;">({n_gaya} buku · mean: {mean_s:.3f})</span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+            top_rows = df_gaya.nlargest(n_sample, "gaya_skor")
+            bot_rows = df_gaya.nsmallest(n_sample, "gaya_skor")
+
+            # Header kolom
+            n_cols = n_sample * 2
+            hdr_cols = st.columns(n_cols)
+            for i in range(n_sample):
+                with hdr_cols[i]:
+                    st.markdown(
+                        f'<div style="text-align:center;background:#E8F5E9;border-radius:6px;'
+                        f'padding:3px;font-size:.62rem;font-weight:700;color:#1B7D3C;">'
+                        f'✦ Tertinggi #{i+1}</div>',
+                        unsafe_allow_html=True
+                    )
+            for i in range(n_sample):
+                with hdr_cols[n_sample + i]:
+                    st.markdown(
+                        f'<div style="text-align:center;background:#FFEBEE;border-radius:6px;'
+                        f'padding:3px;font-size:.62rem;font-weight:700;color:#B71C1C;">'
+                        f'▾ Terendah #{i+1}</div>',
+                        unsafe_allow_html=True
+                    )
+
+            # Kartu buku
+            card_cols = st.columns(n_cols)
+            for i, (_, row) in enumerate(top_rows.iterrows()):
+                with card_cols[i]:
+                    _render_confidence_card(
+                        row,
+                        label_top="✦ Confidence Tertinggi",
+                        label_top_color="#1B7D3C",
+                        badge_text=f"skor {float(row.get('gaya_skor',0)):.3f}",
+                        badge_bg="#E8F5E9",
+                        badge_fg="#1B7D3C",
+                    )
+            for i, (_, row) in enumerate(bot_rows.iterrows()):
+                with card_cols[n_sample + i]:
+                    _render_confidence_card(
+                        row,
+                        label_top="▾ Confidence Terendah",
+                        label_top_color="#B71C1C",
+                        badge_text=f"skor {float(row.get('gaya_skor',0)):.3f}",
+                        badge_bg="#FFEBEE",
+                        badge_fg="#B71C1C",
+                    )
+
+        st.markdown(
+            "<hr style='border:none;border-top:1px solid rgba(128,128,128,.1);margin:.8rem 0;'>",
+            unsafe_allow_html=True
+        )
+
+
+def render_confidence_by_gaya(d):
+    """
+    Visualisasi confidence tertinggi & terendah per kategori gaya ilustrasi.
+    Tiap gaya: histogram distribusi skor + grid buku.
+    """
+    if "gaya_ilustrasi" not in d.columns or "gaya_skor" not in d.columns:
+        st.info("Kolom gaya_ilustrasi atau gaya_skor tidak ditemukan.")
+        return
+
+    d_valid = d[
+        d["gaya_ilustrasi"].notna() &
+        d["image_ok"].astype(str).str.upper().isin(["TRUE", "1"])
+    ].copy()
+    d_valid["gaya_skor"] = pd.to_numeric(d_valid["gaya_skor"], errors="coerce")
+    d_valid = d_valid.dropna(subset=["gaya_skor"])
+
+    if d_valid.empty:
+        st.info("Tidak ada data ilustrasi yang valid.")
+        return
+
+    scol1, scol2 = st.columns([3, 1])
+    with scol1:
+        sel_gaya = st.multiselect(
+            "Pilih gaya ilustrasi",
+            options=list(GAYA_ID.keys()),
+            default=list(GAYA_ID.keys()),
+            format_func=lambda k: f"{GAYA_ICON.get(k, '')} {GAYA_ID.get(k, k)}",
+            key="conf_gaya_sel"
+        )
+    with scol2:
+        n_sample_g = st.selectbox(
+            "Sampel per sisi", [2, 3, 4, 5], index=1,
+            key="conf_gaya_n",
+            help="Jumlah buku tertinggi & terendah per gaya"
+        )
+
+    if not sel_gaya:
+        st.caption("Pilih minimal satu gaya ilustrasi.")
+        return
+
+    for gaya_key in sel_gaya:
+        df_gaya = d_valid[d_valid["gaya_ilustrasi"] == gaya_key].copy()
+        if df_gaya.empty:
+            continue
+
+        gaya_label = GAYA_ID.get(gaya_key, gaya_key)
+        gaya_clr = GAYA_CLR.get(gaya_key, "#999")
+        gaya_icon = GAYA_ICON.get(gaya_key, "")
+        n_total = len(df_gaya)
+        mean_s = df_gaya["gaya_skor"].mean()
+        median_s = df_gaya["gaya_skor"].median()
+
+        with st.expander(
+            f"{gaya_icon} **{gaya_label}** — {n_total:,} buku  ·  "
+            f"mean {mean_s:.3f}  ·  median {median_s:.3f}",
+            expanded=True
+        ):
+            # ── Histogram distribusi skor ─────────────────────────────────
+            skor_hist = df_gaya["gaya_skor"].dropna()
+            bins_edges = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+            bin_labels = ["0–20%", "20–40%", "40–60%", "60–80%", "80–100%"]
+            bin_colors = ["#EF9A9A", "#FFCC80", "#FFF176", "#A5D6A7", "#66BB6A"]
+            counts_arr, _ = np.histogram(skor_hist, bins=bins_edges)
+            total_h = counts_arr.sum()
+
+            hist_html = ""
+            for i, (lbl, cnt) in enumerate(zip(bin_labels, counts_arr)):
+                pct_h = (cnt / total_h * 100) if total_h > 0 else 0
+                bc = bin_colors[i]
+                hist_html += (
+                    f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">'
+                    f'<div style="width:56px;font-size:.6rem;color:#777;text-align:right;'
+                    f'flex-shrink:0;">{lbl}</div>'
+                    f'<div style="flex:1;background:rgba(128,128,128,.08);border-radius:3px;'
+                    f'height:13px;overflow:hidden;">'
+                    f'<div style="width:{pct_h:.1f}%;background:{bc};height:13px;'
+                    f'border-radius:3px;display:flex;align-items:center;'
+                    f'padding-left:4px;">'
+                    f'<span style="font-size:.56rem;font-weight:700;color:#444;">'
+                    f'{cnt if pct_h >= 5 else ""}</span></div></div>'
+                    f'<div style="width:28px;font-size:.58rem;color:#aaa;'
+                    f'flex-shrink:0;">{cnt}</div>'
+                    f'</div>'
+                )
+
+            st.markdown(
+                f'<div style="padding:8px 10px;background:rgba(128,128,128,.03);'
+                f'border:1px solid rgba(128,128,128,.1);border-radius:8px;margin-bottom:.8rem;">'
+                f'<div style="font-size:.62rem;font-weight:600;color:{gaya_clr};'
+                f'margin-bottom:5px;letter-spacing:.05em;text-transform:uppercase;">'
+                f'Distribusi Skor Confidence — {gaya_label}</div>'
+                f'{hist_html}'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+            # ── Header dua sisi ───────────────────────────────────────────
+            hdr_a, hdr_b = st.columns(2)
+            with hdr_a:
+                st.markdown(
+                    f'<div style="text-align:center;background:#E8F5E9;border-radius:8px;'
+                    f'padding:5px;font-size:.7rem;font-weight:700;color:#1B7D3C;margin-bottom:.4rem;">'
+                    f'✦ Confidence Tertinggi (top {n_sample_g})</div>',
+                    unsafe_allow_html=True
+                )
+            with hdr_b:
+                st.markdown(
+                    f'<div style="text-align:center;background:#FFEBEE;border-radius:8px;'
+                    f'padding:5px;font-size:.7rem;font-weight:700;color:#B71C1C;margin-bottom:.4rem;">'
+                    f'▾ Confidence Terendah (bottom {n_sample_g})</div>',
+                    unsafe_allow_html=True
+                )
+
+            top_rows = df_gaya.nlargest(n_sample_g, "gaya_skor")
+            bot_rows = df_gaya.nsmallest(n_sample_g, "gaya_skor")
+
+            # ── Grid buku ─────────────────────────────────────────────────
+            n_grid = n_sample_g * 2
+            all_rows_gaya = list(top_rows.iterrows()) + list(bot_rows.iterrows())
+            card_cols = st.columns(n_grid)
+
+            for i, (_, row) in enumerate(all_rows_gaya):
+                is_top = i < n_sample_g
+                rank = (i + 1) if is_top else (i - n_sample_g + 1)
+                with card_cols[i]:
+                    _render_confidence_card(
+                        row,
+                        label_top="✦ Tertinggi" if is_top else "▾ Terendah",
+                        label_top_color="#1B7D3C" if is_top else "#B71C1C",
+                        badge_text=f"#{rank} · {float(row.get('gaya_skor', 0)):.3f}",
+                        badge_bg="#E8F5E9" if is_top else "#FFEBEE",
+                        badge_fg="#1B7D3C" if is_top else "#B71C1C",
+                    )
+
+            # Divider visual tengah
+            if n_sample_g > 1:
+                st.markdown(
+                    '<div style="display:flex;align-items:center;gap:8px;margin:.5rem 0;opacity:.45;">'
+                    '<div style="flex:1;height:1px;background:rgba(128,128,128,.3)"></div>'
+                    '<div style="font-size:.6rem;color:#999;white-space:nowrap;">← Tertinggi &nbsp;|&nbsp; Terendah →</div>'
+                    '<div style="flex:1;height:1px;background:rgba(128,128,128,.3)"></div>'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
+
+
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### Kartografi Sampul")
@@ -1319,17 +1780,17 @@ elif HAL == "Warna":
             "4. Re-klasifikasi otomatis dijalankan pada load data. **Akurasi ~87%** (200 sampel)."
         )
         hue_info = [
-            ("merah",      "0–10° & 330°+"),
-            ("pink", "0–10°, V>160, S<170"),
-            ("oranye",     "10–25°, V≥130"),
-            ("cokelat",    "10–25°, V<130, S>80"),
-            ("kuning",     "25–40°"),
-            ("hijau",      "40–85°"),
-            ("biru",       "85–130°"),
-            ("ungu",       "130–170°"),
-            ("abu",        "S<50"),
-            ("hitam",      "V<50"),
-            ("putih",      "S<30 & V>160"),
+            ("merah",   "0–10° & 330°+"),
+            ("pink",    "0–10°, V>160, S<170"),
+            ("oranye",  "10–25°, V≥130"),
+            ("cokelat", "10–25°, V<130, S>80"),
+            ("kuning",  "25–40°"),
+            ("hijau",   "40–85°"),
+            ("biru",    "85–130°"),
+            ("ungu",    "130–170°"),
+            ("abu",     "S<50"),
+            ("hitam",   "V<50"),
+            ("putih",   "S<30 & V>160"),
         ]
         hcols = st.columns(len(hue_info))
         for hc, (w, rng) in zip(hcols, hue_info):
@@ -1431,7 +1892,6 @@ elif HAL == "Warna":
             unsafe_allow_html=True
         )
 
-    # Unduh heatmap PNG
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     hm_dl_c1, hm_dl_c2, hm_dl_c3 = st.columns([3, 1, 1])
     with hm_dl_c1:
@@ -1773,6 +2233,29 @@ elif HAL == "Ilustrasi":
                                   yaxis=dict(categoryorder="total ascending"))
             fig_obj.update_traces(textposition="outside", marker_line_width=0)
             st.plotly_chart(fig_obj, use_container_width=True)
+
+    # ══ CONFIDENCE VISUALIZATION (BARU) ══════════════════════════════════════
+
+    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+    st.markdown("### Confidence Tertinggi & Terendah per Gaya Ilustrasi")
+    st.markdown(
+        "<small>Distribusi skor confidence dan sampul buku yang paling yakin (tertinggi) "
+        "serta paling tidak yakin (terendah) per kategori gaya visual — "
+        "dilengkapi analisis YOLO/DETR dan bar distribusi probabilitas gaya.</small>",
+        unsafe_allow_html=True
+    )
+    render_confidence_by_gaya(DF)
+
+    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+    st.markdown("### Confidence Tertinggi & Terendah per Genre")
+    st.markdown(
+        "<small>Buku dengan skor kepercayaan model tertinggi dan terendah "
+        "untuk setiap kombinasi genre × gaya ilustrasi.</small>",
+        unsafe_allow_html=True
+    )
+    render_confidence_by_genre(DF)
+
+    # ══ END CONFIDENCE ════════════════════════════════════════════════════════
 
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Contoh Buku — Kepercayaan Tertinggi per Gaya**")
