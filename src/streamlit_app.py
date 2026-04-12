@@ -1,5 +1,4 @@
 """Kartografi Sampul Sastra Indonesia (2000-2025)"""
-from ilustrasi_komparatif import render_ilustrasi_komparatif
 import io
 import os
 from collections import Counter
@@ -13,6 +12,12 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+import ilustrasi_komparatif as _ik
+_ik.GAYA_CLR  = GAYA_CLR
+_ik.GAYA_ID   = GAYA_ID
+_ik.GAYA_ICON = GAYA_ICON
+_ik.cover_path = cover_path
+render_ilustrasi_komparatif = _ik.render_ilustrasi_komparatif
 
 st.set_page_config(
     page_title="Kartografi Sampul Sastra Indonesia",
