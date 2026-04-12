@@ -1,4 +1,5 @@
 """Kartografi Sampul Sastra Indonesia (2000-2025)"""
+from ilustrasi_komparatif import render_ilustrasi_komparatif
 import io
 import os
 from collections import Counter
@@ -2193,7 +2194,8 @@ elif HAL == "Ilustrasi":
     st.markdown("**Peta Panas Gaya Ilustrasi × Genre**")
     hn_gi = st.slider("Jumlah genre", 6, 20, 12, 2, key="hn_gi")
     st.plotly_chart(heatmap_gaya_genre(DF, hn_gi), use_container_width=True)
-
+    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+    render_ilustrasi_komparatif(DF)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     st.markdown("**Figur Manusia vs Non-Manusia**")
     yh = int(DF["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE").sum())
