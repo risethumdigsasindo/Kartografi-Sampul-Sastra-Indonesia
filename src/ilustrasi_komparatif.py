@@ -391,6 +391,373 @@ def _render_top_bottom(df, genre_kw, style_key, label, color, n=5):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# GENERATE PNG — render grid sampul ke matplotlib figure
+# ──────────────────────────────────────────────────────────────────────────────
+
+import io
+import os
+import numpy as np
+
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    from PIL import Image as PILImage
+    _HAS_PIL = True
+except ImportError:
+    _HAS_PIL = False
+
+
+def _load_cover_image(img_file, size=(200, 280)):
+    """Muat gambar sampul sebagai numpy array. Kembalikan None jika gagal."""
+    if not _HAS_PIL:
+        return None
+    cp = cover_path(img_file)
+    if not cp:
+        return None
+    try:
+        img = PILImage.open(cp).convert("RGB")
+        img = img.resize(size, PILImage.LANCZOS)
+        return np.array(img)
+    except Exception:
+        return None
+
+
+def _build_komparatif_figure(rows_a, rows_b, label_a, label_b,
+                              color_a, color_b, style_key,
+                              title="", subtitle="", dpi=150):
+    """
+    Buat matplotlib figure berisi dua baris sampul (kiri = genre A, kanan = genre B).
+    Setiap sampul ditampilkan dengan: gambar, judul, skor, palet warna, objek YOLO.
+    """
+    if not _HAS_PIL:
+        return None
+
+    WARNA_HEX_LOCAL = {
+        "putih": "#F5F5F0", "hitam": "#1A1A1A", "abu": "#8E8E93",
+        "merah": "#E53935", "pink": "#F06292", "oranye": "#FB8C00",
+        "cokelat": "#795548", "kuning": "#FDD835", "hijau": "#43A047",
+        "biru": "#1E88E5", "ungu": "#8E24AA",
+    }
+
+    n_a = len(rows_a)
+    n_b = len(rows_b)
+    n_cols = max(n_a, n_b)
+    if n_cols == 0:
+        return None
+
+    # Layout: 2 baris genre × n_cols sampul
+    # Tiap sel: gambar + info di bawahnya
+    IMG_W, IMG_H = 1.6, 2.2          # inch per gambar
+    INFO_H       = 1.3               # inch info di bawah gambar
+    CELL_W       = IMG_W + 0.15
+    CELL_H       = IMG_H + INFO_H + 0.1
+    HEADER_H     = 0.55              # judul genre
+    TOP_H        = 0.70              # judul chart
+    GAP_H        = 0.25              # jarak antar baris genre
+    DIVIDER_W    = 0.05
+
+    fig_w = n_cols * CELL_W * 2 + DIVIDER_W + 0.4
+    fig_h = TOP_H + 2 * (HEADER_H + CELL_H) + GAP_H + 0.3
+
+    fig = plt.figure(figsize=(fig_w, fig_h), facecolor="white")
+
+    # ── Judul utama ──────────────────────────────────────────────────────────
+    fig.text(
+        0.5, 1 - 0.08 / fig_h,
+        title, ha="center", va="top",
+        fontsize=11, fontweight="bold", color="#1A1A1A",
+    )
+    if subtitle:
+        fig.text(
+            0.5, 1 - (TOP_H * 0.62) / fig_h,
+            subtitle, ha="center", va="top",
+            fontsize=7.5, color="#888",
+        )
+
+    def _draw_genre_row(rows, label, color, row_idx):
+        """Gambar satu baris genre di posisi row_idx (0 = kiri/atas, 1 = kanan/bawah)."""
+        x0_frac = row_idx * (0.5 + DIVIDER_W / fig_w / 2)
+
+        # Header genre
+        y_hdr = 1 - (TOP_H + row_idx * (HEADER_H + CELL_H + GAP_H) + HEADER_H * 0.6) / fig_h
+        fig.text(
+            x0_frac + 0.01, y_hdr,
+            f"{'✦' if row_idx == 0 else '▸'} {label}",
+            ha="left", va="center",
+            fontsize=9, fontweight="bold", color=color,
+        )
+
+        for ci, (_, row) in enumerate(rows):
+            # Koordinat axes untuk gambar
+            x_ax = (x0_frac + ci * CELL_W / fig_w)
+            y_ax = 1 - (TOP_H + row_idx * (HEADER_H + CELL_H + GAP_H) + HEADER_H + CELL_H) / fig_h
+            w_ax = IMG_W / fig_w
+            h_ax = IMG_H / fig_h
+
+            ax_img = fig.add_axes([x_ax, y_ax, w_ax, h_ax])
+            img_arr = _load_cover_image(row.get("IMAGE_FILE"))
+            if img_arr is not None:
+                ax_img.imshow(img_arr)
+            else:
+                ax_img.set_facecolor("#F0F0F0")
+                ax_img.text(0.5, 0.5, "📖", ha="center", va="center",
+                            fontsize=18, transform=ax_img.transAxes)
+            ax_img.axis("off")
+
+            # Border warna genre
+            for spine in ax_img.spines.values():
+                spine.set_edgecolor(color)
+                spine.set_linewidth(1.5)
+                spine.set_visible(True)
+
+            # ── Info di bawah gambar ─────────────────────────────────────
+            ax_info = fig.add_axes([
+                x_ax, y_ax - INFO_H / fig_h,
+                w_ax, INFO_H / fig_h
+            ])
+            ax_info.set_xlim(0, 1)
+            ax_info.set_ylim(0, 1)
+            ax_info.axis("off")
+            ax_info.set_facecolor("white")
+
+            # Skor confidence
+            try:
+                skor = float(row.get("gaya_skor", 0))
+                skor_str = f"{skor:.3f}"
+            except Exception:
+                skor_str = "–"
+
+            gaya_lbl = GAYA_ID.get(str(row.get("gaya_ilustrasi", "")), "")
+            ax_info.text(
+                0.03, 0.97,
+                f"{gaya_lbl} · {skor_str}",
+                ha="left", va="top", fontsize=6,
+                color=GAYA_CLR.get(str(row.get("gaya_ilustrasi", "")), "#999"),
+                fontweight="bold",
+                transform=ax_info.transAxes,
+            )
+
+            # Judul (maks 2 baris)
+            title_txt = str(row.get("TITLE", "–"))
+            if len(title_txt) > 32:
+                title_txt = title_txt[:30] + "…"
+            ax_info.text(
+                0.03, 0.83,
+                title_txt,
+                ha="left", va="top", fontsize=6.5, fontweight="bold",
+                color="#1A1A1A", wrap=True,
+                transform=ax_info.transAxes,
+            )
+
+            # Penulis + tahun
+            year = int(row["YEAR"]) if row.get("YEAR", 0) and int(row.get("YEAR", 0)) > 0 else "–"
+            author = str(row.get("AUTHOR", "–"))
+            if len(author) > 22: author = author[:20] + "…"
+            ax_info.text(
+                0.03, 0.68,
+                f"{author} · {year}",
+                ha="left", va="top", fontsize=5.5, color="#888",
+                transform=ax_info.transAxes,
+            )
+
+            # Palet warna (mini bar)
+            pal_parts = []
+            for pi in range(1, 6):
+                hx  = str(row.get(f"warna_hex_{pi}", "") or "").strip()
+                pct = row.get(f"warna_pct_{pi}", 0)
+                try: pct = float(pct)
+                except: pct = 0.0
+                if not hx or hx in ("nan", "") or pct <= 0: continue
+                if not hx.startswith("#"): hx = "#" + hx
+                pal_parts.append((hx, pct))
+            if pal_parts:
+                total_p = sum(p for _, p in pal_parts)
+                cx = 0.03
+                BAR_Y, BAR_H2 = 0.54, 0.06
+                for hx, pct in pal_parts:
+                    seg = (pct / total_p) * 0.94
+                    rect = mpatches.FancyBboxPatch(
+                        (cx, BAR_Y), seg - 0.005, BAR_H2,
+                        boxstyle="square,pad=0",
+                        facecolor=hx,
+                        edgecolor=hx,
+                        linewidth=0.2,
+                        transform=ax_info.transAxes,
+                    )
+                    ax_info.add_patch(rect)
+                    cx += seg
+
+            # Figur manusia
+            ada = str(row.get("yolo_ada_manusia", "")).upper() == "TRUE"
+            detr = str(row.get("detr_ada_manusia", "")).upper() == "TRUE"
+            figur_txt = "👤 " + ("+".join(filter(None, [
+                "YOLO" if ada else "", "DETR" if detr else ""
+            ])) or "—")
+            ax_info.text(
+                0.03, 0.44,
+                figur_txt,
+                ha="left", va="top", fontsize=5.5,
+                color="#1565C0" if (ada or detr) else "#aaa",
+                transform=ax_info.transAxes,
+            )
+
+            # Objek YOLO
+            objek_str = str(row.get("yolo_objek", "") or "")
+            objs = [
+                o.strip() for o in objek_str.split(",")
+                if o.strip() and o.strip() not in ("0", "nan", "")
+            ][:5]
+            obj_txt = ", ".join(objs) if objs else "—"
+            if len(obj_txt) > 30: obj_txt = obj_txt[:28] + "…"
+            ax_info.text(
+                0.03, 0.32,
+                obj_txt,
+                ha="left", va="top", fontsize=5, color="#666",
+                transform=ax_info.transAxes,
+            )
+
+    # Gambar dua baris
+    _draw_genre_row(list(rows_a.iterrows()), label_a, color_a, 0)
+    _draw_genre_row(list(rows_b.iterrows()), label_b, color_b, 1)
+
+    # Garis pembatas tengah (vertikal untuk pair, horizontal untuk top/bottom)
+    fig.add_axes([0.5, 0.05, 0.002, 0.85]).set_visible(False)
+
+    # Caption
+    fig.text(
+        0.5, 0.01,
+        "Sumber: Kartografi Sampul Sastra Indonesia 2000–2025  ·  "
+        "Metode: CLIP zero-shot · YOLOv8n · DETR ResNet-50",
+        ha="center", va="bottom", fontsize=5.5, color="#bbb",
+    )
+
+    fig.patch.set_facecolor("white")
+    return fig
+
+
+def _fig_to_bytes_komparatif(fig, dpi=200):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi,
+                bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def _download_row(df, genre_a_kw, genre_b_kw, style_key,
+                  label_a, label_b, color_a, color_b,
+                  filename, section_title, section_subtitle, n=4):
+    """Render tombol unduh PNG di bawah setiap section."""
+    dl_c1, dl_c2, dl_c3 = st.columns([3, 1, 1])
+    with dl_c1:
+        st.markdown(
+            "<small>💡 <strong>Tips Word:</strong> Unduh PNG lalu sisipkan via "
+            "<em>Insert → Pictures</em>. Klik kanan → "
+            "<em>Wrap Text → In Line with Text</em>, "
+            "tarik sudut sambil tahan Shift untuk resize proporsional.</small>",
+            unsafe_allow_html=True,
+        )
+    with dl_c2:
+        dpi_sel = st.selectbox(
+            "Resolusi", [150, 200, 300], index=1,
+            key=f"dpi_{filename}",
+            help="300 DPI terbaik untuk cetak",
+        )
+    with dl_c3:
+        if st.button(
+            "🖼 Buat & Unduh PNG",
+            key=f"btn_{filename}",
+            use_container_width=True,
+        ):
+            with st.spinner("Membuat gambar…"):
+                rows_a = _get_top_books(df, genre_a_kw, style_key, n=n)
+                rows_b = _get_top_books(df, genre_b_kw, style_key, n=n)
+                if rows_a.empty and rows_b.empty:
+                    st.warning("Tidak ada data untuk diunduh.")
+                    return
+                fig = _build_komparatif_figure(
+                    rows_a, rows_b,
+                    label_a, label_b,
+                    color_a, color_b,
+                    style_key,
+                    title=section_title,
+                    subtitle=section_subtitle,
+                    dpi=dpi_sel,
+                )
+                if fig is None:
+                    st.warning(
+                        "Pustaka Pillow tidak tersedia. "
+                        "Jalankan: pip install pillow"
+                    )
+                    return
+                img_bytes = _fig_to_bytes_komparatif(fig, dpi=dpi_sel)
+                st.download_button(
+                    label=f"⬇ Download {filename}.png",
+                    data=img_bytes,
+                    file_name=f"{filename}.png",
+                    mime="image/png",
+                    key=f"dl_{filename}",
+                    use_container_width=True,
+                )
+
+
+def _download_row_single(df, genre_kw, style_key, label, color,
+                         filename, section_title, section_subtitle, n=4):
+    """Tombol unduh PNG untuk satu genre (top/bottom)."""
+    dl_c1, dl_c2, dl_c3 = st.columns([3, 1, 1])
+    with dl_c1:
+        st.markdown(
+            "<small>💡 <strong>Tips Word:</strong> Unduh PNG lalu sisipkan via "
+            "<em>Insert → Pictures</em>. Klik kanan → "
+            "<em>Wrap Text → In Line with Text</em>, "
+            "tarik sudut sambil tahan Shift untuk resize proporsional.</small>",
+            unsafe_allow_html=True,
+        )
+    with dl_c2:
+        dpi_sel = st.selectbox(
+            "Resolusi", [150, 200, 300], index=1,
+            key=f"dpi_{filename}",
+            help="300 DPI terbaik untuk cetak",
+        )
+    with dl_c3:
+        if st.button(
+            "🖼 Buat & Unduh PNG",
+            key=f"btn_{filename}",
+            use_container_width=True,
+        ):
+            with st.spinner("Membuat gambar…"):
+                top = _get_top_books(df, genre_kw, style_key, n=n, lowest=False)
+                bot = _get_top_books(df, genre_kw, style_key, n=n, lowest=True)
+                if top.empty and bot.empty:
+                    st.warning("Tidak ada data untuk diunduh.")
+                    return
+                fig = _build_komparatif_figure(
+                    top, bot,
+                    f"{label} — Tertinggi",
+                    f"{label} — Terendah",
+                    color, "#999",
+                    style_key,
+                    title=section_title,
+                    subtitle=section_subtitle,
+                    dpi=dpi_sel,
+                )
+                if fig is None:
+                    st.warning("Pustaka Pillow tidak tersedia.")
+                    return
+                img_bytes = _fig_to_bytes_komparatif(fig, dpi=dpi_sel)
+                st.download_button(
+                    label=f"⬇ Download {filename}.png",
+                    data=img_bytes,
+                    file_name=f"{filename}.png",
+                    mime="image/png",
+                    key=f"dl_{filename}",
+                    use_container_width=True,
+                )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # FUNGSI UTAMA — panggil ini dari app Streamlit
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -463,6 +830,21 @@ def render_ilustrasi_komparatif(df):
             '</div>',
             unsafe_allow_html=True,
         )
+        st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+        _download_row(
+            df,
+            genre_a_kw=["Horor", "Horror"],
+            genre_b_kw=["Anak", "Children"],
+            style_key="hand_drawn",
+            label_a="Horor — Gambar Tangan",
+            label_b="Anak-anak — Gambar Tangan",
+            color_a="#B71C1C",
+            color_b="#1565C0",
+            filename="komparatif_horor_vs_anak",
+            section_title="Gambar Tangan: Horor vs Anak-anak",
+            section_subtitle="Confidence CLIP tertinggi per genre — Kartografi Sampul Sastra Indonesia 2000–2025",
+            n=n_sampel,
+        )
 
     # ── TAB 2: FIKSI POPULER (flat_graphic) ──────────────────────────────────
     with tab2:
@@ -486,10 +868,15 @@ def render_ilustrasi_komparatif(df):
             _render_top_bottom(
                 df, genre_kw, "flat_graphic", label, color, n=n_sampel
             )
-            st.markdown(
-                "<div style='height:.5rem'></div>",
-                unsafe_allow_html=True,
+            st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+            _download_row_single(
+                df, genre_kw, "flat_graphic", label, color,
+                filename=f"komparatif_flat_{label.lower().replace(' ','_').replace('/','_')}",
+                section_title=f"Ilustrasi Datar — {label}",
+                section_subtitle="Confidence CLIP tertinggi & terendah — Kartografi Sampul Sastra Indonesia 2000–2025",
+                n=n_sampel,
             )
+            st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
 
     # ── TAB 3: FOTOGRAFI — Puisi vs Fiksi Sejarah ────────────────────────────
     with tab3:
@@ -526,6 +913,21 @@ def render_ilustrasi_komparatif(df):
             '</div>',
             unsafe_allow_html=True,
         )
+        st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+        _download_row(
+            df,
+            genre_a_kw=["Puisi", "Poetry", "Sajak"],
+            genre_b_kw=["Fiksi Sejarah", "Sejarah", "Historical"],
+            style_key="photograph",
+            label_a="Puisi — Fotografi",
+            label_b="Fiksi Sejarah — Fotografi",
+            color_a="#7B1FA2",
+            color_b="#1B5E20",
+            filename="komparatif_foto_puisi_vs_sejarah",
+            section_title="Fotografi: Puisi vs Fiksi Sejarah",
+            section_subtitle="Confidence CLIP tertinggi — Kartografi Sampul Sastra Indonesia 2000–2025",
+            n=n_sampel,
+        )
 
     # ── TAB 4: KOLASE ─────────────────────────────────────────────────────────
     with tab4:
@@ -547,6 +949,14 @@ def render_ilustrasi_komparatif(df):
         ]:
             _render_top_bottom(
                 df, genre_kw, "collage", label, color, n=n_sampel
+            )
+            st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+            _download_row_single(
+                df, genre_kw, "collage", label, color,
+                filename=f"komparatif_kolase_{label.lower().replace(' ','_').replace('/','_')}",
+                section_title=f"Kolase — {label}",
+                section_subtitle="Confidence CLIP tertinggi & terendah — Kartografi Sampul Sastra Indonesia 2000–2025",
+                n=n_sampel,
             )
             st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
 
@@ -570,6 +980,14 @@ def render_ilustrasi_komparatif(df):
         ]:
             _render_top_bottom(
                 df, genre_kw, "abstract", label, color, n=n_sampel
+            )
+            st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+            _download_row_single(
+                df, genre_kw, "abstract", label, color,
+                filename=f"komparatif_abstrak_{label.lower().replace(' ','_').replace('/','_')}",
+                section_title=f"Abstrak — {label}",
+                section_subtitle="Confidence CLIP tertinggi & terendah — Kartografi Sampul Sastra Indonesia 2000–2025",
+                n=n_sampel,
             )
             st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
 
