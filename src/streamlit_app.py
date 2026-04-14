@@ -735,6 +735,270 @@ def heatmap_tf_genre(d, top_n=12):
     ))
     return fig
 
+    # ── TAMBAHAN: Tipografi per Genre ─────────────────────────────────────────────
+st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+st.markdown("**Distribusi Tipografi per Genre**")
+st.markdown(
+    "<small>Pilih genre untuk melihat komposisi typeface, simpangan dari korpus keseluruhan, "
+    "dan contoh sampul dengan confidence tertinggi per kategori.</small>",
+    unsafe_allow_html=True
+)
+
+DF_tf_genre = DF[
+    DF["typeface_kategori"].notna() & 
+    (DF["typeface_kategori"] != "unclassified")
+].copy()
+
+gc_tf = genre_counts(DF_tf_genre, normalize=True)
+genre_opts_tf = [g for g, n in gc_tf.most_common() if g not in GENRE_EXCLUDE and n >= 5]
+
+tg_col1, tg_col2 = st.columns([3, 1])
+with tg_col1:
+    sel_genres_tf = st.multiselect(
+        "Pilih genre",
+        options=genre_opts_tf,
+        default=genre_opts_tf[:6],
+        key="tf_genre_sel"
+    )
+with tg_col2:
+    tf_genre_mode = st.radio(
+        "Tampilan",
+        ["Grouped Bar", "Heatmap"],
+        key="tf_genre_mode"
+    )
+
+if sel_genres_tf:
+    genre_lists_tf = expand_genres(DF_tf_genre["GENRES"], normalize=True)
+    
+    # Hitung distribusi typeface per genre yang dipilih
+    tf_genre_data = {}
+    for g in sel_genres_tf:
+        mask = [g in gl for gl in genre_lists_tf]
+        sub = DF_tf_genre[mask]
+        if sub.empty:
+            continue
+        vc = sub["typeface_kategori"].map(TYPEFACE_ID).value_counts(normalize=True)
+        tf_genre_data[g] = {TYPEFACE_ID[k]: vc.get(TYPEFACE_ID[k], 0.0) for k in TYPEFACE_ID}
+
+    if tf_genre_data:
+        mat_tf_genre = pd.DataFrame(tf_genre_data).T  # genre × typeface
+        
+        if tf_genre_mode == "Grouped Bar":
+            # Grouped bar: tiap genre satu grup, warna per typeface
+            rows_gb = []
+            for genre, row_data in mat_tf_genre.iterrows():
+                for tf_label, val in row_data.items():
+                    kl = GENRE_KLASTER_MAP.get(genre)
+                    genre_disp = f"[{kl['id']}] {genre}" if kl else genre
+                    rows_gb.append({"Genre": genre_disp, "Typeface": tf_label, "Proporsi": val})
+            df_gb_tf = pd.DataFrame(rows_gb)
+            
+            fig_tf_genre = px.bar(
+                df_gb_tf, x="Genre", y="Proporsi", color="Typeface",
+                barmode="stack",
+                color_discrete_map={TYPEFACE_ID[k]: TYPEFACE_CLR[k] for k in TYPEFACE_ID},
+            )
+            fig_tf_genre.update_layout(
+                **pb(360),
+                xaxis_title="", yaxis_title="Proporsi",
+                xaxis_tickangle=-30,
+                legend=dict(orientation="h", y=-.25, font=dict(size=9))
+            )
+            st.plotly_chart(fig_tf_genre, use_container_width=True)
+
+        else:  # Heatmap
+            tf_labels_order = [TYPEFACE_ID[k] for k in TYPEFACE_ID]
+            y_labels_tf = []
+            for g in mat_tf_genre.index:
+                kl = GENRE_KLASTER_MAP.get(g)
+                y_labels_tf.append(f"{g}  [{kl['id']}]" if kl else g)
+            
+            text_tf = (mat_tf_genre[tf_labels_order] * 100).round(0).astype(int).astype(str) + "%"
+            fig_tf_hm = go.Figure(data=go.Heatmap(
+                z=mat_tf_genre[tf_labels_order].values,
+                x=tf_labels_order,
+                y=y_labels_tf,
+                colorscale="Purples",
+                text=text_tf.values,
+                texttemplate="%{text}",
+                textfont=dict(size=10, color="#1A1A1A"),
+                hovertemplate="Genre: %{y}<br>Typeface: %{x}<br>Proporsi: %{text}<extra></extra>",
+                showscale=True,
+                zmin=0, zmax=1,
+            ))
+            fig_tf_hm.update_layout(
+                **pb(max(300, len(sel_genres_tf) * 40),
+                     margin=dict(l=180, r=20, t=32, b=90),
+                     yaxis=dict(autorange="reversed"),
+                     xaxis=dict(tickangle=-30),
+                     xaxis_title="", yaxis_title="")
+            )
+            st.plotly_chart(fig_tf_hm, use_container_width=True)
+
+        # ── Simpangan dari keseluruhan korpus ──────────────────────────────
+        st.markdown("**Simpangan dari Keseluruhan Korpus**")
+        st.caption("Nilai positif = genre ini lebih banyak memakai typeface tersebut dibanding rata-rata.")
+        
+        tc_all_corpus = DF_tf_genre["typeface_kategori"].map(TYPEFACE_ID).value_counts(normalize=True)
+        
+        rows_diff = []
+        for g in sel_genres_tf:
+            mask = [g in gl for gl in genre_lists_tf]
+            sub = DF_tf_genre[mask]
+            if sub.empty:
+                continue
+            tc_g = sub["typeface_kategori"].map(TYPEFACE_ID).value_counts(normalize=True)
+            kl = GENRE_KLASTER_MAP.get(g)
+            genre_disp = f"[{kl['id']}] {g}" if kl else g
+            for k in TYPEFACE_ID:
+                lbl = TYPEFACE_ID[k]
+                delta = tc_g.get(lbl, 0) - tc_all_corpus.get(lbl, 0)
+                rows_diff.append({"Genre": genre_disp, "Typeface": lbl, "Delta": delta})
+        
+        df_diff_tf = pd.DataFrame(rows_diff)
+        if not df_diff_tf.empty:
+            fig_diff_tf = px.bar(
+                df_diff_tf, x="Delta", y="Genre", color="Typeface",
+                orientation="h", barmode="group",
+                color_discrete_map={TYPEFACE_ID[k]: TYPEFACE_CLR[k] for k in TYPEFACE_ID},
+            )
+            fig_diff_tf.add_vline(x=0, line_dash="dash", line_color="rgba(128,128,128,.4)")
+            fig_diff_tf.update_layout(
+                **pb(max(300, len(sel_genres_tf) * 55)),
+                showlegend=True,
+                xaxis_title="Selisih proporsi vs korpus", yaxis_title="",
+                legend=dict(orientation="h", y=-.2, font=dict(size=9))
+            )
+            st.plotly_chart(fig_diff_tf, use_container_width=True)
+
+        # ── Contoh buku per genre × typeface ──────────────────────────────
+        st.markdown("**Contoh Buku — Confidence Tertinggi per Genre × Typeface**")
+        df_ex_tf = DF_tf_genre[DF_tf_genre["image_ok"]].copy()
+        df_ex_tf["typeface_skor"] = pd.to_numeric(df_ex_tf["typeface_skor"], errors="coerce")
+        genre_lists_ex = expand_genres(df_ex_tf["GENRES"], normalize=True)
+        
+        for g in sel_genres_tf[:3]:  # batasi 3 genre agar tidak terlalu panjang
+            mask_ex = [g in gl for gl in genre_lists_ex]
+            sub_ex = df_ex_tf[mask_ex]
+            if sub_ex.empty:
+                continue
+            
+            kl = GENRE_KLASTER_MAP.get(g)
+            kl_color = kl["color"] if kl else "#555"
+            kl_bg = kl["bg"] if kl else "#F5F5F5"
+            
+            st.markdown(
+                f'<div style="background:{kl_bg};border-left:4px solid {kl_color};'
+                f'border-radius:0 8px 8px 0;padding:6px 12px;margin:.8rem 0 .4rem;">'
+                f'<span style="font-weight:600;color:{kl_color};">{g}</span>'
+                f'<span style="font-size:.7rem;color:{kl_color};opacity:.65;margin-left:8px;">'
+                f'— {len(sub_ex):,} buku teranalisis</span></div>',
+                unsafe_allow_html=True
+            )
+            
+            # Satu contoh per typeface yang ada di genre ini
+            tf_present = sub_ex["typeface_kategori"].value_counts()
+            top_tf_ex = list(tf_present.head(min(7, len(tf_present))).index)
+            ex_cols = st.columns(len(top_tf_ex))
+            
+            for col_ex, tk in zip(ex_cols, top_tf_ex):
+                sub_tk = sub_ex[sub_ex["typeface_kategori"] == tk]
+                best_tk = sub_tk.nlargest(1, "typeface_skor").iloc[0]
+                clr_tk = TYPEFACE_CLR.get(tk, "#999")
+                with col_ex:
+                    cp = cover_path(best_tk.get("IMAGE_FILE"))
+                    if cp:
+                        st.image(cp, use_container_width=True)
+                    try:
+                        sc_tk = f"{float(best_tk.get('typeface_skor', 0)):.2f}"
+                    except Exception:
+                        sc_tk = "–"
+                    st.markdown(
+                        f'<div style="font-size:.6rem;text-align:center;padding:.2rem 0;">'
+                        f'<strong style="color:{clr_tk}">{TYPEFACE_ID.get(tk, tk)}</strong><br>'
+                        f'<span style="opacity:.6">{str(best_tk.get("TITLE", ""))[:22]}</span><br>'
+                        f'<span style="opacity:.45">skor {sc_tk}</span></div>',
+                        unsafe_allow_html=True
+                    )
+else:
+    st.caption("Pilih minimal satu genre.")
+
+# ── TAMBAHAN: Pergeseran Tipografi per Dekade ──────────────────────────────────
+st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+st.markdown("**Pergeseran Tipografi: 2000–2025**")
+st.markdown(
+    "<small>Apakah ada pergeseran dominasi script → display atau sebaliknya dari tahun ke tahun?</small>",
+    unsafe_allow_html=True
+)
+
+df_shift = DF_tf[DF_tf["YEAR"] > 0].copy()
+df_shift["tf_label"] = df_shift["typeface_kategori"].map(TYPEFACE_ID)
+df_shift["dekade"] = pd.cut(
+    df_shift["YEAR"],
+    bins=[1999, 2004, 2009, 2014, 2019, 2025],
+    labels=["2000–04", "2005–09", "2010–14", "2015–19", "2020–25"]
+)
+
+shift_grouped = (
+    df_shift.groupby(["dekade", "tf_label"], observed=True)
+    .size().reset_index(name="n")
+)
+total_per_dekade = shift_grouped.groupby("dekade", observed=True)["n"].transform("sum")
+shift_grouped["proporsi"] = shift_grouped["n"] / total_per_dekade
+
+fig_shift = px.line(
+    shift_grouped, x="dekade", y="proporsi", color="tf_label",
+    markers=True,
+    color_discrete_map={TYPEFACE_ID[k]: TYPEFACE_CLR[k] for k in TYPEFACE_ID},
+    labels={"dekade": "", "proporsi": "Proporsi", "tf_label": "Typeface"}
+)
+fig_shift.update_layout(
+    **pb(320),
+    legend=dict(orientation="h", y=-.2, font=dict(size=10)),
+    xaxis_title="", yaxis_title="Proporsi dalam periode"
+)
+st.plotly_chart(fig_shift, use_container_width=True)
+
+# ── TAMBAHAN: Cross-tab Typeface × Gaya Ilustrasi ─────────────────────────────
+st.markdown("<hr class='thin'>", unsafe_allow_html=True)
+st.markdown("**Typeface × Gaya Ilustrasi**")
+st.markdown(
+    "<small>Apakah jenis font berkorelasi dengan gaya visual sampul? "
+    "Misal: apakah script selalu berpasangan dengan hand_drawn?</small>",
+    unsafe_allow_html=True
+)
+
+df_cross = DF[
+    DF["typeface_kategori"].notna() & 
+    (DF["typeface_kategori"] != "unclassified") &
+    DF["gaya_ilustrasi"].notna()
+].copy()
+
+cross_tab = pd.crosstab(
+    df_cross["typeface_kategori"].map(TYPEFACE_ID),
+    df_cross["gaya_ilustrasi"].map(GAYA_ID),
+    normalize="index"  # proporsi dalam tiap baris (typeface)
+)
+
+text_cross = (cross_tab * 100).round(0).astype(int).astype(str) + "%"
+fig_cross = go.Figure(data=go.Heatmap(
+    z=cross_tab.values,
+    x=cross_tab.columns.tolist(),
+    y=cross_tab.index.tolist(),
+    colorscale="RdYlGn",
+    text=text_cross.values,
+    texttemplate="%{text}",
+    textfont=dict(size=10, color="#1A1A1A"),
+    hovertemplate="Typeface: %{y}<br>Gaya: %{x}<br>Proporsi: %{text}<extra></extra>",
+    showscale=True,
+    zmin=0, zmax=0.6,
+))
+fig_cross.update_layout(
+    **pb(300, margin=dict(l=160, r=20, t=32, b=90)),
+    yaxis=dict(autorange="reversed"),
+    xaxis_title="Gaya Ilustrasi", yaxis_title="Typeface"
+)
+st.plotly_chart(fig_cross, use_container_width=True)
 
 def heatmap_gaya_genre(d, top_n=12):
     genres = _top_genres_filtered(d, top_n)
