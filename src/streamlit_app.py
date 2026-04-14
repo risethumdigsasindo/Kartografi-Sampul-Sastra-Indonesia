@@ -744,10 +744,15 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-DF_tf_genre = DF[
-    DF["typeface_kategori"].notna() & 
-    (DF["typeface_kategori"] != "unclassified")
-].copy()
+DF.columns = DF.columns.str.strip()
+
+if "typeface_kategori" in DF.columns:
+    DF_tf_genre = DF[
+        DF["typeface_kategori"].notna() & 
+        (DF["typeface_kategori"] != "unclassified")
+    ].copy()
+else:
+    st.error("Kolom 'typeface_kategori' tidak ditemukan")
 
 gc_tf = genre_counts(DF_tf_genre, normalize=True)
 genre_opts_tf = [g for g, n in gc_tf.most_common() if g not in GENRE_EXCLUDE and n >= 5]
