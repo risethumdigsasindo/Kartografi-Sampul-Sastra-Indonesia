@@ -735,7 +735,7 @@ def heatmap_tf_genre(d, top_n=12):
     ))
     return fig
 
-    # ── TAMBAHAN: Tipografi per Genre ─────────────────────────────────────────────
+# ── TAMBAHAN: Tipografi per Genre ─────────────────────────────────────────────
 st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 st.markdown("**Distribusi Tipografi per Genre**")
 st.markdown(
