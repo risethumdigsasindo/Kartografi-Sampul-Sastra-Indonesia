@@ -940,8 +940,8 @@ elif HAL == "Warna":
 # ══════════════════════════════════════════════════════════════════════════════
 elif HAL == "Tipografi":
     st.markdown("## Analisis Tipografi")
- 
-    # ── Catatan metodologi — prominern di atas ────────────────────────────────
+
+    # ── Catatan metodologi ─────────────────────────────────────────────
     st.markdown(
         """
         <div style="background:#FFF8E1;border-left:4px solid #F9A825;border-radius:0 8px 8px 0;
@@ -950,409 +950,197 @@ elif HAL == "Tipografi":
             Catatan Metodologi
         </div>
         <div style="font-size:.78rem;color:#5D4037;line-height:1.6;">
-        Analisis tipografi di sini bekerja pada dua lapisan dengan reliabilitas berbeda.<br>
-        <b>Lapisan 1 — Klasifikasi visual</b> (5.069 buku): model CLIP menganalisis fitur piksel
-        huruf dan menghasilkan kategori <i>typeface</i>. Karena tidak semua teks pada sampul adalah
-        judul/nama penulis, klasifikasi ini memiliki noise yang cukup tinggi dan sebaiknya
-        dibaca sebagai <i>estimasi</i>.<br>
-        <b>Lapisan 2 — Identifikasi font konkret</b> (788 buku, ~15%): EasyOCR mendeteksi teks,
-        lalu dicocokkan ke basis data Google Fonts. Hasilnya lebih presisi namun terbatas
-        pada sampul yang teks fontnya terbaca oleh OCR. Di antara 788 ini,
-        terdapat potensi false positive dari kata-kata pendek dalam judul yang kebetulan cocok
-        dengan nama font (mis. "rasa", "anta", "sura") — sehingga bagian ini juga harus
-        dibaca dengan kehati-hatian.
+        Analisis tipografi terdiri dari dua lapisan:<br>
+        <b>Lapisan 1 — Klasifikasi visual</b> (CLIP, seluruh korpus): estimasi kategori typeface.<br>
+        <b>Lapisan 2 — Identifikasi font</b> (OCR + DB): lebih presisi, tapi terbatas (~15%).<br>
+        Keduanya memiliki noise dan perlu dibaca secara interpretatif.
         </div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    # ── Tab utama ─────────────────────────────────────────────────────────────
+    # ── Tabs ───────────────────────────────────────────────────────────
     tab_visual, tab_font, tab_genre, tab_buku = st.tabs([
         "📊 Typeface (Visual)", "🔤 Font Teridentifikasi", "🗂️ Font × Genre", "🖼️ Jelajah Buku"
     ])
- 
-    # ══════════════════════════════════════════════════════════════════════════
-    # TAB 1 — TYPEFACE VISUAL (klasifikasi model, seluruh korpus)
-    # ══════════════════════════════════════════════════════════════════════════
-    with tab_visual:
-        st.markdown(
-            "<small>Klasifikasi berbasis model visual (CLIP) — seluruh 5.069 sampul. "
-            "Akurasi estimasi, bukan identifikasi font konkret.</small>",
-            unsafe_allow_html=True
-        )
- 
-        # Kategori typeface cards
-        st.markdown("**Enam Kategori Typeface**")
-        tf_cols = st.columns(len(TF_ANALISIS))
-        for col_tf, key in zip(tf_cols, TF_ANALISIS):
-            clr  = TYPEFACE_CLR[key]
-            font = TYPEFACE_FONT[key]
-            with col_tf:
-                st.markdown(
-                    f'<div style="border:1px solid rgba(128,128,128,.18);border-radius:8px;'
-                    f'padding:.55rem .45rem;text-align:center;">'
-                    f'<div style="font-family:{font};font-size:1.5rem;color:{clr};font-weight:700;">Aa</div>'
-                    f'<div style="font-size:.63rem;font-weight:600;margin:.2rem 0 .1rem">{TYPEFACE_ID[key]}</div>'
-                    f'<div style="font-size:.58rem;opacity:.5;text-align:left;line-height:1.35">{TYPEFACE_DESC[key]}</div></div>',
-                    unsafe_allow_html=True
-                )
- 
-        st.markdown("<hr class='thin'>", unsafe_allow_html=True)
- 
-        ca, cb = st.columns(2)
-        with ca:
-            st.markdown("**Distribusi Typeface**")
-            tc = DF_tf["typeface_kategori"].map(TYPEFACE_ID).value_counts()
-            fig = px.bar(x=tc.values, y=tc.index, orientation="h",
-                         color=tc.index,
-                         color_discrete_map={TYPEFACE_ID[k]: TYPEFACE_CLR[k] for k in TYPEFACE_ID},
-                         text=tc.values)
-            fig.update_layout(**pb(300), showlegend=False, xaxis_title="", yaxis_title="",
-                              yaxis=dict(categoryorder="total ascending"))
-            fig.update_traces(textposition="outside", marker_line_width=0)
-            st.plotly_chart(fig, use_container_width=True)
- 
-        with cb:
-            st.markdown("**Tren Typeface per Tahun**")
-            dft2 = DF_tf[DF_tf["YEAR"] > 0].copy()
-            dft2["tf"] = dft2["typeface_kategori"].map(TYPEFACE_ID)
-            tr2 = dft2.groupby(["YEAR", "tf"]).size().reset_index(name="n")
-            fig2 = px.bar(tr2, x="YEAR", y="n", color="tf", barmode="stack",
-                          color_discrete_map={TYPEFACE_ID[k]: TYPEFACE_CLR[k] for k in TYPEFACE_ID})
-            fig2.update_layout(**pb(300), xaxis_title="", yaxis_title="", showlegend=True,
-                               legend=dict(orientation="h", y=-.22, font=dict(size=9)))
-            st.plotly_chart(fig2, use_container_width=True)
- 
-        st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-        st.markdown("**Pergeseran Tipografi per Dekade**")
-        df_shift = DF_tf[DF_tf["YEAR"] > 0].copy()
-        df_shift["tf_label"] = df_shift["typeface_kategori"].map(TYPEFACE_ID)
-        df_shift["dekade"] = pd.cut(df_shift["YEAR"],
-                                    bins=[1999, 2004, 2009, 2014, 2019, 2025],
-                                    labels=["2000–04", "2005–09", "2010–14", "2015–19", "2020–25"])
-        shift_g = df_shift.groupby(["dekade", "tf_label"], observed=True).size().reset_index(name="n")
-        shift_g["prop"] = shift_g.groupby("dekade", observed=True)["n"].transform(lambda x: x / x.sum())
-        fig_shift = px.line(shift_g, x="dekade", y="prop", color="tf_label", markers=True,
-                            color_discrete_map={TYPEFACE_ID[k]: TYPEFACE_CLR[k] for k in TYPEFACE_ID},
-                            labels={"dekade": "", "prop": "Proporsi", "tf_label": "Typeface"})
-        fig_shift.update_layout(**pb(320), legend=dict(orientation="h", y=-.2, font=dict(size=10)))
-        st.plotly_chart(fig_shift, use_container_width=True)
- 
-        st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-        st.markdown("**Peta Panas Typeface × Genre**")
-        hn_tf = st.slider("Jumlah genre", 6, 20, 12, 2, key="hn_tf")
-        st.plotly_chart(heatmap_tf_genre(DF, hn_tf), use_container_width=True)
- 
-    # ══════════════════════════════════════════════════════════════════════════
-    # TAB 2 — FONT TERIDENTIFIKASI (tipe_font dari Google Fonts DB)
-    # ══════════════════════════════════════════════════════════════════════════
-    with tab_font:
-        st.markdown(
-            "<small>Hanya 788 buku (~15%) yang font-nya berhasil diidentifikasi via OCR + DB match. "
-            "Di antara ini, sebagian masih mengandung false positive — terutama font Display dari "
-            "kata pendek dalam judul (mis. 'Anta', 'Asar', 'Sura'). "
-            "Font non-Display berjumlah 70 buku dan merupakan data paling dapat dipercaya.</small>",
-            unsafe_allow_html=True
-        )
- 
-        df_tf_identified = DF[DF["font_name"].notna() & DF["tipe_font"].notna()].copy()
-        n_identified = len(df_tf_identified)
-        n_display    = (df_tf_identified["tipe_font"].str.startswith("Display")).sum()
-        n_nondisplay = n_identified - n_display
- 
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Font teridentifikasi", f"{n_identified:,}", f"{n_identified/len(DF)*100:.1f}% korpus")
-        m2.metric("Display / Dekoratif",  f"{n_display:,}",   "banyak false positive")
-        m3.metric("Non-Display (lebih andal)", f"{n_nondisplay:,}", "sans-serif, serif, dll")
- 
-        st.markdown("<hr class='thin'>", unsafe_allow_html=True)
- 
-        # ── Distribusi tipe_font (donut) ──────────────────────────────────────
-        fa, fb = st.columns(2)
-        with fa:
-            st.markdown("**Distribusi Tipe Font**")
-            tipe_vc = df_tf_identified["tipe_font"].value_counts()
-            fig_tf = px.pie(
-                values=tipe_vc.values,
-                names=tipe_vc.index,
-                hole=0.45,
-                color=tipe_vc.index,
-                color_discrete_map=TIPE_FONT_CLR,
-            )
-            fig_tf.update_layout(**pb(300))
-            fig_tf.update_traces(textinfo="percent+label", textfont_size=10)
-            st.plotly_chart(fig_tf, use_container_width=True)
- 
-        with fb:
-            st.markdown("**Font Teridentifikasi — Top 25**")
-            fn_vc = df_tf_identified["font_name"].value_counts().head(25).reset_index()
-            fn_vc.columns = ["Font", "Jumlah"]
-            fn_vc = fn_vc.merge(
-                df_tf_identified[["font_name", "tipe_font"]].drop_duplicates("font_name"),
-                left_on="Font", right_on="font_name", how="left"
-            )
-            fig_fn = px.bar(
-                fn_vc, x="Jumlah", y="Font", orientation="h",
-                color="tipe_font",
-                color_discrete_map=TIPE_FONT_CLR,
-                text="Jumlah",
-            )
-            fig_fn.update_layout(
-                **pb(max(360, len(fn_vc) * 18)),
-                showlegend=True,
-                legend=dict(orientation="h", y=-.12, font=dict(size=9)),
-                xaxis_title="", yaxis_title="",
-                yaxis=dict(categoryorder="total ascending"),
-            )
-            fig_fn.update_traces(textposition="outside", marker_line_width=0)
-            st.plotly_chart(fig_fn, use_container_width=True)
- 
-        # ── Non-Display detail ────────────────────────────────────────────────
-        st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-        st.markdown("**Font Non-Display — Data Paling Andal (70 buku)**")
-        st.caption(
-            "Berikut font-font yang bukan Display, yang identifikasinya lebih dapat dipercaya "
-            "karena nama fontnya tidak bertumpang-tindih dengan kata umum bahasa Indonesia."
-        )
- 
-        df_nondisplay = df_tf_identified[
-            ~df_tf_identified["tipe_font"].str.startswith("Display", na=False)
-        ].copy()
- 
-        tipe_order = [
-            "Humanist Sans-Serif", "Neo-Grotesque", "Geometric Sans-Serif", "Grotesque Sans-Serif",
-            "Humanist Serif", "Transitional Serif", "Slab Serif", "Handwriting",
-        ]
-        tipe_present = [t for t in tipe_order if t in df_nondisplay["tipe_font"].values]
- 
-        for tipe in tipe_present:
-            sub_t = df_nondisplay[df_nondisplay["tipe_font"] == tipe]
-            fn_list = sub_t["font_name"].value_counts()
-            clr_t   = TIPE_FONT_CLR.get(tipe, "#999")
- 
-            pills_html = ""
-            for fn, cnt in fn_list.items():
-                pills_html += (
-                    f'<span style="display:inline-block;margin:2px 3px;padding:2px 10px;'
-                    f'border-radius:20px;font-size:.72rem;font-weight:500;'
-                    f'background:{clr_t}22;color:{clr_t};border:1px solid {clr_t}55;">'
-                    f'{fn} <span style="opacity:.6">({cnt})</span></span>'
-                )
- 
-            st.markdown(
-                f'<div style="margin:.5rem 0;">'
-                f'<span style="font-size:.78rem;font-weight:600;color:{clr_t};">{tipe}</span>'
-                f'<span style="font-size:.7rem;opacity:.5;margin-left:6px;">{len(sub_t)} buku</span><br>'
-                f'{pills_html}</div>',
-                unsafe_allow_html=True
-            )
- 
-        # ── Tren tipe_font per tahun ──────────────────────────────────────────
-        st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-        st.markdown("**Tren Tipe Font per Tahun** (font teridentifikasi)")
-        df_tf_yr = df_tf_identified[df_tf_identified["YEAR"] > 0].copy()
-        tr_tf = df_tf_yr.groupby(["YEAR", "tipe_font"]).size().reset_index(name="n")
-        fig_tfy = px.bar(
-            tr_tf, x="YEAR", y="n", color="tipe_font", barmode="stack",
-            color_discrete_map=TIPE_FONT_CLR,
-        )
-        fig_tfy.update_layout(
-            **pb(300), xaxis_title="", yaxis_title="",
-            legend=dict(orientation="h", y=-.2, font=dict(size=9)),
-        )
-        st.plotly_chart(fig_tfy, use_container_width=True)
- 
-    # ══════════════════════════════════════════════════════════════════════════
-    # TAB 3 — FONT × GENRE (heatmap keterhubungan)
-    # ══════════════════════════════════════════════════════════════════════════
-    with tab_genre:
-        st.markdown("**Apakah font-font ini tersebar merata atau melekat pada genre tertentu?**")
-        st.markdown(
-            "<small>Heatmap menunjukkan frekuensi kemunculan setiap font pada tiap genre. "
-            "Font yang tersebar merata (baris berwarna merata) menunjukkan font yang generik dan tidak khas. "
-            "Font yang terkonsentrasi pada satu-dua genre (baris berwarna di kolom tertentu saja) "
-            "mengindikasikan kemungkinan asosiasi estetis antara font dan genre tersebut.</small>",
-            unsafe_allow_html=True
-        )
- 
-        c_fg1, c_fg2 = st.columns([2, 1])
-        with c_fg1:
-            min_bk = st.slider("Minimum kemunculan font", 3, 15, 5, 1, key="fg_min")
-        with c_fg2:
-            top_n_fg = st.slider("Maks. jumlah font", 10, 30, 20, 5, key="fg_top")
- 
-        mat_fg = font_genre_matrix(DF, min_books=min_bk, top_fonts=top_n_fg)
- 
-        if mat_fg.empty:
-            st.info("Tidak ada font yang memenuhi kriteria minimum kemunculan.")
-        else:
-            # Normalisasi per baris (proporsi per font) untuk tampil sebagai heatmap
-            mat_fg_pct = mat_fg.div(mat_fg.sum(axis=1), axis=0).fillna(0)
- 
-            # Anotasi: angka asli (frekuensi)
-            text_fg = mat_fg.values.astype(str)
-            text_fg[mat_fg.values == 0] = ""
- 
-            # Label baris: tambahkan tipe_font
-            font_tipe_map = (
-                DF[DF["font_name"].notna() & DF["tipe_font"].notna()]
-                .drop_duplicates("font_name")
-                .set_index("font_name")["tipe_font"]
-                .to_dict()
-            )
-            y_labels_fg = []
-            for fn in mat_fg.index:
-                tipe = font_tipe_map.get(fn, "")
-                clr_short = tipe[:3] if tipe else ""
-                y_labels_fg.append(f"{fn}  [{tipe}]" if tipe else fn)
- 
-            fig_fg = go.Figure(data=go.Heatmap(
-                z=mat_fg_pct.values,
-                x=mat_fg_pct.columns.tolist(),
-                y=y_labels_fg,
-                colorscale="YlOrRd",
-                text=text_fg,
-                texttemplate="%{text}",
-                textfont=dict(size=9, color="#1A1A1A"),
-                showscale=True,
-                zmin=0, zmax=0.5,
-                colorbar=dict(title="Proporsi<br>per font", tickformat=".0%"),
-            ))
-            fig_fg.update_layout(
-                **pb(
-                    max(380, len(mat_fg) * 26),
-                    margin=dict(l=200, r=20, t=40, b=100),
-                ),
-                yaxis=dict(autorange="reversed"),
-                xaxis=dict(tickangle=-35),
-                xaxis_title="",
-                yaxis_title="",
-            )
-            st.plotly_chart(fig_fg, use_container_width=True)
- 
-            # ── Tabel ringkasan ────────────────────────────────────────────────
-            st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-            st.markdown("**Tabel Ringkasan: Font, Tipe, Kemunculan, dan Genre Terbanyak**")
- 
-            rows_sum = []
-            for fn in mat_fg.index:
-                row_counts = mat_fg.loc[fn]
-                total      = int(row_counts.sum())
-                top2_g     = row_counts.nlargest(2)
-                top2_str   = ", ".join(
-                    f"{g} ({int(n)})" for g, n in top2_g.items() if n > 0
-                )
-                # Hitung konsentrasi: proporsi genre terbesar
-                konsentrasi = round(top2_g.iloc[0] / total * 100) if total > 0 else 0
-                tipe = font_tipe_map.get(fn, "–")
-                rows_sum.append({
-                    "Font": fn,
-                    "Tipe Font": tipe,
-                    "Total Buku": total,
-                    "Genre Terbanyak": top2_str,
-                    "Konsentrasi (%)": konsentrasi,
-                })
- 
-            df_sum = pd.DataFrame(rows_sum).sort_values("Total Buku", ascending=False)
- 
-            # Styling: warnai kolom Konsentrasi
-            def _style_konsentrasi(val):
-                if val >= 60:
-                    return "background-color:#FADADD;color:#922B21;font-weight:600"
-                if val >= 40:
-                    return "background-color:#FDEBD0;color:#784212"
-                return ""
- 
-            st.dataframe(
-                df_sum.style.applymap(_style_konsentrasi, subset=["Konsentrasi (%)"]),
-                use_container_width=True,
-                hide_index=True,
-            )
- 
-            st.caption(
-                "Konsentrasi = % kemunculan font pada genre terbesarnya. "
-                "Merah (≥60%) = cenderung melekat pada satu genre. "
-                "Oranye (40–59%) = agak tersebar. "
-                "Putih (<40%) = tersebar merata."
-            )
- 
-            # ── Scatter: total buku vs konsentrasi ────────────────────────────
-            st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-            st.markdown("**Sebaran vs Konsentrasi**")
-            st.caption("Font di kanan atas: sering dipakai tapi terpusat di satu genre.")
-            fig_sc2 = px.scatter(
-                df_sum,
-                x="Total Buku", y="Konsentrasi (%)",
-                text="Font",
-                color="Tipe Font",
-                color_discrete_map=TIPE_FONT_CLR,
-                size="Total Buku",
-                size_max=28,
-                hover_data=["Genre Terbanyak"],
-            )
-            fig_sc2.update_traces(textposition="top center", textfont_size=9)
-            fig_sc2.add_hline(y=50, line_dash="dash",
-                              line_color="rgba(128,128,128,.35)",
-                              annotation_text="50% konsentrasi")
-            fig_sc2.update_layout(
-                **pb(380),
-                xaxis_title="Jumlah buku",
-                yaxis_title="Konsentrasi genre (%)",
-                legend=dict(orientation="h", y=-.15, font=dict(size=9)),
-            )
-            st.plotly_chart(fig_sc2, use_container_width=True)
- 
-    # ══════════════════════════════════════════════════════════════════════════
-    # TAB 4 — JELAJAH BUKU (dari blok lama, digabung ke sini)
-    # ══════════════════════════════════════════════════════════════════════════
-    with tab_buku:
-        st.markdown("**Contoh Buku — Confidence Tertinggi per Typeface**")
-        df_tv = DF_tf[DF_tf["image_ok"]].copy()
-        df_tv["typeface_skor"] = pd.to_numeric(df_tv["typeface_skor"], errors="coerce")
-        ex_cols7 = st.columns(len(TF_ANALISIS))
-        for col_ex, key in zip(ex_cols7, TF_ANALISIS):
-            sub = df_tv[df_tv["typeface_kategori"] == key]
-            if sub.empty: continue
-            best = sub.nlargest(1, "typeface_skor").iloc[0]
-            clr  = TYPEFACE_CLR[key]
-            with col_ex:
-                cp = cover_path(best.get("IMAGE_FILE"))
-                if cp: st.image(cp, use_container_width=True)
-                try: sc = f"{float(best.get('typeface_skor', 0)):.2f}"
-                except: sc = "–"
-                st.markdown(
-                    f'<div style="font-size:.62rem;padding:.25rem 0;">'
-                    f'<div style="font-weight:600;color:{clr}">{TYPEFACE_ID[key]}</div>'
-                    f'<div style="opacity:.6;line-height:1.3">{str(best.get("TITLE",""))[:24]}</div>'
-                    f'<div style="opacity:.5">skor {sc}</div></div>',
-                    unsafe_allow_html=True
-                )
- 
-        st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-        st.markdown("**Cari Buku berdasarkan Tipografi**")
-        tfc1, tfc2, tfc3 = st.columns([2, 2, 1])
-        with tfc1: q_tf = st.text_input("Judul / penulis", key="tf_q")
-        with tfc2:
-            tf_sel = st.selectbox(
-                "Filter typeface", ["Semua"] + [TYPEFACE_ID[k] for k in TF_ANALISIS],
-                key="tf_sel"
-            )
-        with tfc3: n_tf2 = st.slider("Tampilkan", 4, 32, 8, 4, key="tf_n")
- 
-        dtf = DF_tf[DF_tf["image_ok"]].copy()
-        if q_tf:
-            ql2 = q_tf.lower()
-            dtf = dtf[
-                dtf["TITLE"].str.lower().str.contains(ql2, na=False)
-                | dtf["AUTHOR"].str.lower().str.contains(ql2, na=False)
-            ]
-        if tf_sel != "Semua":
-            tf_rev = {v: k for k, v in TYPEFACE_ID.items()}
-            dtf = dtf[dtf["typeface_kategori"] == tf_rev.get(tf_sel, tf_sel)]
-        if not dtf.empty:
-            grid(dtf.head(n_tf2), show_tf=True)
 
+    # ══════════════════════════════════════════════════════════════════
+    # TAB 1 — TYPEFACE VISUAL
+    # ══════════════════════════════════════════════════════════════════
+    with tab_visual:
+
+        st.markdown("**Distribusi Typeface**")
+        tc = DF_tf["typeface_kategori"].map(TYPEFACE_ID).value_counts()
+
+        fig = px.bar(
+            x=tc.values, y=tc.index, orientation="h",
+            color=tc.index,
+            color_discrete_map={TYPEFACE_ID[k]: TYPEFACE_CLR[k] for k in TYPEFACE_ID},
+            text=tc.values
+        )
+        fig.update_layout(**pb(300), showlegend=False)
+        st.plotly_chart(fig, use_container_width=True, key="tf_dist")
+
+        st.markdown("**Tren Typeface per Tahun**")
+        dft = DF_tf[DF_tf["YEAR"] > 0].copy()
+        dft["tf"] = dft["typeface_kategori"].map(TYPEFACE_ID)
+
+        tr = dft.groupby(["YEAR", "tf"]).size().reset_index(name="n")
+
+        fig2 = px.bar(tr, x="YEAR", y="n", color="tf", barmode="stack")
+        fig2.update_layout(**pb(300))
+        st.plotly_chart(fig2, use_container_width=True, key="tf_trend")
+
+        st.markdown("**Pergeseran per Dekade**")
+        df_shift = DF_tf[DF_tf["YEAR"] > 0].copy()
+        df_shift["tf"] = df_shift["typeface_kategori"].map(TYPEFACE_ID)
+
+        df_shift["dekade"] = pd.cut(
+            df_shift["YEAR"],
+            bins=[1999, 2004, 2009, 2014, 2019, 2025],
+            labels=["2000–04", "2005–09", "2010–14", "2015–19", "2020–25"]
+        )
+
+        shift = df_shift.groupby(["dekade", "tf"]).size().reset_index(name="n")
+        shift["prop"] = shift.groupby("dekade")["n"].transform(lambda x: x/x.sum())
+
+        fig3 = px.line(shift, x="dekade", y="prop", color="tf", markers=True)
+        fig3.update_layout(**pb(320))
+        st.plotly_chart(fig3, use_container_width=True, key="tf_shift")
+
+        st.markdown("**Heatmap Typeface × Genre**")
+        hn = st.slider("Jumlah genre", 6, 20, 12, 2, key="tf_slider")
+
+        st.plotly_chart(
+            heatmap_tf_genre(DF, hn),
+            use_container_width=True,
+            key="tf_heatmap"
+        )
+
+    # ══════════════════════════════════════════════════════════════════
+    # TAB 2 — FONT TERIDENTIFIKASI
+    # ══════════════════════════════════════════════════════════════════
+    with tab_font:
+
+        df_tf_id = DF[DF["font_name"].notna() & DF["tipe_font"].notna()].copy()
+
+        st.metric("Font teridentifikasi", len(df_tf_id))
+
+        st.markdown("**Distribusi Tipe Font**")
+        vc = df_tf_id["tipe_font"].value_counts()
+
+        fig = px.pie(values=vc.values, names=vc.index, hole=0.4)
+        st.plotly_chart(fig, use_container_width=True, key="font_pie")
+
+        st.markdown("**Top 25 Font**")
+        fn = df_tf_id["font_name"].value_counts().head(25).reset_index()
+        fn.columns = ["Font", "Jumlah"]
+
+        fig2 = px.bar(fn, x="Jumlah", y="Font", orientation="h")
+        st.plotly_chart(fig2, use_container_width=True, key="font_bar")
+
+        st.markdown("**Tren Font per Tahun**")
+        df_yr = df_tf_id[df_tf_id["YEAR"] > 0]
+
+        tr = df_yr.groupby(["YEAR", "tipe_font"]).size().reset_index(name="n")
+
+        fig3 = px.bar(tr, x="YEAR", y="n", color="tipe_font", barmode="stack")
+        st.plotly_chart(fig3, use_container_width=True, key="font_trend")
+
+    # ══════════════════════════════════════════════════════════════════
+    # TAB 3 — FONT × GENRE
+    # ══════════════════════════════════════════════════════════════════
+    with tab_genre:
+
+        min_bk = st.slider("Minimum kemunculan", 3, 15, 5, key="fg_min")
+        top_n = st.slider("Top font", 10, 30, 20, key="fg_top")
+
+        mat = font_genre_matrix(DF, min_books=min_bk, top_fonts=top_n)
+
+        if not mat.empty:
+
+            mat_pct = mat.div(mat.sum(axis=1), axis=0).fillna(0)
+
+            fig = go.Figure(data=go.Heatmap(
+                z=mat_pct.values,
+                x=mat_pct.columns,
+                y=mat_pct.index,
+                colorscale="YlOrRd"
+            ))
+
+            st.plotly_chart(fig, use_container_width=True, key="fg_heatmap")
+
+            # summary table
+            rows = []
+            for fn in mat.index:
+                total = int(mat.loc[fn].sum())
+                top = mat.loc[fn].nlargest(1)
+
+                kons = round(top.iloc[0] / total * 100) if total > 0 else 0
+
+                rows.append({
+                    "Font": fn,
+                    "Total": total,
+                    "Konsentrasi (%)": kons
+                })
+
+            df_sum = pd.DataFrame(rows)
+
+            def style_k(val):
+                if val >= 60:
+                    return "background-color:#FADADD"
+                elif val >= 40:
+                    return "background-color:#FDEBD0"
+                return ""
+
+            st.dataframe(
+                df_sum.style.map(style_k, subset=["Konsentrasi (%)"]),
+                use_container_width=True
+            )
+
+            fig2 = px.scatter(df_sum, x="Total", y="Konsentrasi (%)", text="Font")
+            st.plotly_chart(fig2, use_container_width=True, key="fg_scatter")
+
+    # ══════════════════════════════════════════════════════════════════
+    # TAB 4 — JELAJAH
+    # ══════════════════════════════════════════════════════════════════
+    with tab_buku:
+
+        st.markdown("**Contoh Buku**")
+
+        dfv = DF_tf[DF_tf["image_ok"]].copy()
+
+        cols = st.columns(len(TF_ANALISIS))
+
+        for col, key in zip(cols, TF_ANALISIS):
+            sub = dfv[dfv["typeface_kategori"] == key]
+            if sub.empty:
+                continue
+
+            best = sub.nlargest(1, "typeface_skor").iloc[0]
+
+            with col:
+                cp = cover_path(best.get("IMAGE_FILE"))
+                if cp:
+                    st.image(cp, use_container_width=True)
+
+        st.markdown("**Cari Buku**")
+
+        q = st.text_input("Cari", key="tf_search")
+        n = st.slider("Jumlah", 4, 32, 8, key="tf_n")
+
+        dt = dfv.copy()
+
+        if q:
+            ql = q.lower()
+            dt = dt[
+                dt["TITLE"].str.lower().str.contains(ql, na=False) |
+                dt["AUTHOR"].str.lower().str.contains(ql, na=False)
+            ]
+
+        if not dt.empty:
+            grid(dt.head(n))
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ILUSTRASI
