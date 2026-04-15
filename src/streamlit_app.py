@@ -60,6 +60,33 @@ WARNA_TXT = {
 WARNA_ORDER = ["putih","oranye","cokelat","biru","merah","pink","hitam","kuning","ungu","hijau","abu"]
 
 # ── KONSTANTA TIPOGRAFI ───────────────────────────────────────────────────────
+TIPE_FONT_GROUP = {
+    "Display":             "display",
+    "Display Condensed":   "display",
+    "Handwriting":         "script",
+    "Humanist Sans-Serif": "sans_serif",
+    "Neo-Grotesque":       "sans_serif",
+    "Geometric Sans-Serif":"sans_serif",
+    "Grotesque Sans-Serif":"sans_serif",
+    "Humanist Serif":      "humanist_serif",
+    "Transitional Serif":  "transitional_serif",
+    "Slab Serif":          "slab_serif",
+}
+# Warna per tipe_font (untuk konsistensi visual)
+TIPE_FONT_CLR = {
+    "Display":             "#FFA726",
+    "Display Condensed":   "#FFB74D",
+    "Handwriting":         "#26A69A",
+    "Humanist Sans-Serif": "#42A5F5",
+    "Neo-Grotesque":       "#29B6F6",
+    "Geometric Sans-Serif":"#26C6DA",
+    "Grotesque Sans-Serif":"#4FC3F7",
+    "Humanist Serif":      "#5C6BC0",
+    "Transitional Serif":  "#7E57C2",
+    "Slab Serif":          "#EC407A",
+}
+
+
 TYPEFACE_ID = {
     "humanist_serif":     "Humanist Serif",
     "transitional_serif": "Transitional Serif",
@@ -851,16 +878,32 @@ elif HAL == "Warna":
 # ══════════════════════════════════════════════════════════════════════════════
 elif HAL == "Tipografi":
     st.markdown("## Analisis Tipografi")
-
-    with st.expander("Cara kerja analisis tipografi", expanded=False):
-        st.markdown(
-            "**MSER + CLIP ViT-B/32 zero-shot + Feature Matrix**\n\n"
-            "1. **MSER** mendeteksi blob stabil khas huruf.\n"
-            "2. **Feature extraction**: curvature, connectivity, stroke uniformity, dll.\n"
-            "3. **CLIP ViT-B/32** mengukur kemiripan dengan deskripsi 6 kategori typeface.\n"
-            "4. Post-processing: script dengan confidence < 0.30 di-relabel ke display.\n\n"
-            f"**Teranalisis:** {len(DF_tf):,} buku dari {len(DF):,} total."
-        )
+ 
+    # ── Catatan metodologi — prominern di atas ────────────────────────────────
+    st.markdown(
+        """
+        <div style="background:#FFF8E1;border-left:4px solid #F9A825;border-radius:0 8px 8px 0;
+        padding:10px 16px;margin-bottom:.8rem;">
+        <div style="font-weight:600;font-size:.82rem;color:#795548;margin-bottom:4px;">
+            Catatan Metodologi
+        </div>
+        <div style="font-size:.78rem;color:#5D4037;line-height:1.6;">
+        Analisis tipografi di sini bekerja pada dua lapisan dengan reliabilitas berbeda.<br>
+        <b>Lapisan 1 — Klasifikasi visual</b> (5.069 buku): model CLIP menganalisis fitur piksel
+        huruf dan menghasilkan kategori <i>typeface</i>. Karena tidak semua teks pada sampul adalah
+        judul/nama penulis, klasifikasi ini memiliki noise yang cukup tinggi dan sebaiknya
+        dibaca sebagai <i>estimasi</i>.<br>
+        <b>Lapisan 2 — Identifikasi font konkret</b> (788 buku, ~15%): EasyOCR mendeteksi teks,
+        lalu dicocokkan ke basis data Google Fonts. Hasilnya lebih presisi namun terbatas
+        pada sampul yang teks fontnya terbaca oleh OCR. Di antara 788 ini,
+        terdapat potensi false positive dari kata-kata pendek dalam judul yang kebetulan cocok
+        dengan nama font (mis. "rasa", "anta", "sura") — sehingga bagian ini juga harus
+        dibaca dengan kehati-hatian.
+        </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     # Kategori typeface cards
     st.markdown("**Enam Kategori Typeface**")
