@@ -250,6 +250,68 @@ def compute_warna_distribusi(d):
     return pd.Series(acc)
 
 
+# ── Fungsi helper (letakkan di bagian HELPERS, sebelum load_data) ─────────────
+ 
+def _is_reliable_font(row):
+    """Return True jika font match dianggap reliable (bukan false positive substring)."""
+    metode = str(row.get("typeface_metode", ""))
+    score  = row.get("font_match_score", 0)
+    try: score = float(score)
+    except: score = 0.0
+    if metode == "v4_db_exact":
+        return True
+    if metode == "v4_db_fuzzy" and score >= 90:
+        return True
+    # substring hanya reliable jika font_name panjang >= 6 karakter
+    # (mengurangi false positive dari kata 4-huruf dalam judul)
+    if metode == "v4_db_substring":
+        fn = str(row.get("font_name", "") or "")
+        return len(fn) >= 6
+    return False
+ 
+ 
+def font_genre_matrix(d, min_books=3, top_fonts=20):
+    """
+    Hitung matriks font × genre (frekuensi kemunculan, bukan proporsi).
+    Hanya font yang reliable dan muncul >= min_books kali.
+    Return: DataFrame (index=font_name, columns=genre)
+    """
+    has_font = d[d["font_name"].notna()].copy()
+    has_font["_reliable"] = has_font.apply(_is_reliable_font, axis=1)
+    has_font = has_font[has_font["_reliable"]]
+ 
+    # Pilih font yang cukup sering
+    font_counts = has_font["font_name"].value_counts()
+    selected_fonts = font_counts[font_counts >= min_books].head(top_fonts).index.tolist()
+    if not selected_fonts:
+        return pd.DataFrame()
+ 
+    # Expand genres
+    genre_lists = expand_genres(has_font["GENRES"], normalize=True)
+    has_font = has_font.copy()
+    has_font["_genres"] = genre_lists
+ 
+    # Top genre
+    all_g = [g for gl in genre_lists for g in gl if g not in GENRE_EXCLUDE]
+    top_genres_fg = [g for g, _ in Counter(all_g).most_common(14)]
+ 
+    mat = pd.DataFrame(0, index=selected_fonts, columns=top_genres_fg)
+    for _, row in has_font.iterrows():
+        fn = row["font_name"]
+        if fn not in selected_fonts:
+            continue
+        for g in row["_genres"]:
+            if g in top_genres_fg:
+                mat.loc[fn, g] += 1
+ 
+    # Urutkan font berdasarkan total kemunculan
+    mat["_total"] = mat.sum(axis=1)
+    mat = mat.sort_values("_total", ascending=False).drop(columns="_total")
+    return mat
+ 
+
+
+
 # ── LOAD DATA ─────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def load_data(path):
