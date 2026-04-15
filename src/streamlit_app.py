@@ -1258,66 +1258,6 @@ elif HAL == "Tipografi":
                 top2_str   = ", ".join(
                     f"{g} ({int(n)})" for g, n in top2_g.items() if n > 0
                 )
-                # Hitung konsentrasi: proporsi genre terbesar
-                konsentrasi = round(top2_g.iloc[0] / total * 100) if total > 0 else 0
-                tipe = font_tipe_map.get(fn, "–")
-                rows_sum.append({
-                    "Font": fn,
-                    "Tipe Font": tipe,
-                    "Total Buku": total,
-                    "Genre Terbanyak": top2_str,
-                    "Konsentrasi (%)": konsentrasi,
-                })
- 
-            df_sum = pd.DataFrame(rows_sum).sort_values("Total Buku", ascending=False)
- 
-            # Styling: warnai kolom Konsentrasi
-            def _style_konsentrasi(val):
-                if val >= 60:
-                    return "background-color:#FADADD;color:#922B21;font-weight:600"
-                if val >= 40:
-                    return "background-color:#FDEBD0;color:#784212"
-                return ""
- 
-            st.dataframe(
-                df_sum.style.applymap(_style_konsentrasi, subset=["Konsentrasi (%)"]),
-                use_container_width=True,
-                hide_index=True,
-            )
- 
-            st.caption(
-                "Konsentrasi = % kemunculan font pada genre terbesarnya. "
-                "Merah (≥60%) = cenderung melekat pada satu genre. "
-                "Oranye (40–59%) = agak tersebar. "
-                "Putih (<40%) = tersebar merata."
-            )
- 
-            # ── Scatter: total buku vs konsentrasi ────────────────────────────
-            st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-            st.markdown("**Sebaran vs Konsentrasi**")
-            st.caption("Font di kanan atas: sering dipakai tapi terpusat di satu genre.")
-            fig_sc2 = px.scatter(
-                df_sum,
-                x="Total Buku", y="Konsentrasi (%)",
-                text="Font",
-                color="Tipe Font",
-                color_discrete_map=TIPE_FONT_CLR,
-                size="Total Buku",
-                size_max=28,
-                hover_data=["Genre Terbanyak"],
-            )
-            fig_sc2.update_traces(textposition="top center", textfont_size=9)
-            fig_sc2.add_hline(y=50, line_dash="dash",
-                              line_color="rgba(128,128,128,.35)",
-                              annotation_text="50% konsentrasi")
-            fig_sc2.update_layout(
-                **pb(380),
-                xaxis_title="Jumlah buku",
-                yaxis_title="Konsentrasi genre (%)",
-                legend=dict(orientation="h", y=-.15, font=dict(size=9)),
-            )
-            st.plotly_chart(fig_sc2, use_container_width=True)
- 
     # ══════════════════════════════════════════════════════════════════════════
     # TAB 4 — JELAJAH BUKU (dari blok lama, digabung ke sini)
     # ══════════════════════════════════════════════════════════════════════════
