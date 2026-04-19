@@ -120,8 +120,7 @@ KLASTER_COOC = [
     {
         "id": "K1", "label": "Klaster 1 — Novel sebagai genre bentuk yang dominan",
         "short": "Klaster 1", "color": "#2E4057", "bg": "#EEF2F7",
-        "genres": ["Novel", "Cerita Pendek", "Antologi", "Puisi", "Drama", "Remaja",
-                   "Fiksi Sejarah", "Komedi"],
+        "genres": ["Novel", "Cerita Pendek", "Antologi", "Puisi"],
     },
     {
         "id": "K2", "label": "Klaster 2 — Romansa sebagai gravitasi genre tematik",
