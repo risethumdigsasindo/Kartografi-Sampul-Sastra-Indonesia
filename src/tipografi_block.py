@@ -191,12 +191,22 @@ def _konfidence_badge(match_type, low_conf):
 
 
 def expand_genres(series, normalize=True):
+    # Sinkron penuh dengan GENRE_NORM di app.py — termasuk Roman Kontemporer → Romansa
     GENRE_NORM = {
-        "Cinta": "Romansa", "Roman": "Romansa", "Romansa Kontemporer": "Romansa",
-        "Kontemporer": "Romansa", "Thriller": "Thriller/Misteri",
-        "Misteri": "Thriller/Misteri", "Sejarah": "Fiksi Sejarah",
-        "Historical Fiction": "Fiksi Sejarah", "Historical": "Fiksi Sejarah",
-        "Humor": "Komedi", "Fiksi Ilmiah": "Fiksi Sains",
+        "Cinta": "Romansa", "Roman": "Romansa",
+        "Romansa Kontemporer": "Romansa", "Roman Kontemporer": "Romansa",
+        "Kontemporer": "Romansa", "Romansatic": "Romansa",
+        "Young Adult Romansace": "Romansa",
+        "Thriller": "Thriller/Misteri", "Misteri": "Thriller/Misteri",
+        "Misteri Thriller": "Thriller/Misteri", "Thriller Suspense": "Thriller/Misteri",
+        "Psychological Thriller": "Thriller/Misteri", "Suspense": "Thriller/Misteri",
+        "Detective": "Thriller/Misteri", "Kriminal": "Thriller/Misteri",
+        "Supranatural": "Horor", "Humor": "Komedi",
+        "New Adult": "Remaja",
+        "Collections": "Antologi", "Middle Grade": "Fantasi",
+        "Fiksi Ilmiah": "Fiksi Sains", "Distopia": "Fiksi Sains",
+        "Sejarah": "Fiksi Sejarah", "Historical Fiction": "Fiksi Sejarah",
+        "Historical": "Fiksi Sejarah",
     }
     out = []
     for v in series:
@@ -219,7 +229,8 @@ def expand_genres(series, normalize=True):
 
 def _top_genres(df, n=16):
     from collections import Counter
-    GENRE_EXCLUDE = {"Sastra Indonesia", "Sastra", "Fiksi", "Nonfiction", "Non-fiction"}
+    GENRE_EXCLUDE = {"Sastra Indonesia", "Sastra", "Fiksi", "Nonfiction", "Non-fiction",
+                     "Nonfiksi", "Non Fiksi", "Non-fiksi"}
     c = Counter()
     for gl in expand_genres(df["GENRES"], normalize=True):
         c.update(gl)
