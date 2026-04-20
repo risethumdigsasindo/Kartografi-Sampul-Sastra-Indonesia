@@ -164,6 +164,12 @@ def pb(height=320, **kw):
     return b
 
 
+def _klaster_label(genre):
+    """Kembalikan label genre dengan suffix klaster, misal: 'Romansa  [K2]'"""
+    kl = GENRE_KLASTER_MAP_LOCAL.get(genre)
+    return f"{genre}  [{kl['id']}]" if kl else genre
+
+
 def _section_header(title, subtitle="", color="#2E4057", bg="#EEF2F7"):
     st.markdown(
         f'<div style="background:{bg};border-left:4px solid {color};'
@@ -191,7 +197,7 @@ def _konfidence_badge(match_type, low_conf):
 
 
 def expand_genres(series, normalize=True):
-    # Sinkron penuh dengan GENRE_NORM di app.py — termasuk Roman Kontemporer → Romansa
+    # Sinkron penuh dengan GENRE_NORM di app.py
     GENRE_NORM = {
         "Cinta": "Romansa", "Roman": "Romansa",
         "Romansa Kontemporer": "Romansa", "Roman Kontemporer": "Romansa",
@@ -425,6 +431,9 @@ def _tab_heatmap_genre(df):
     tf_keys = TF_ANALISIS
     tf_labels = [TYPEFACE_ID[k] for k in tf_keys]
 
+    # ── PERBAIKAN: buat y_labels dengan suffix klaster ────────────────────
+    y_labels = [_klaster_label(g) for g in genres]
+
     mat = pd.DataFrame(0.0, index=genres, columns=tf_labels)
     genre_lists = expand_genres(df_hm["GENRES"], normalize=True)
 
@@ -440,7 +449,7 @@ def _tab_heatmap_genre(df):
     text_mat = (mat * 100).round(0).astype(int).astype(str) + "%"
 
     fig = go.Figure(data=go.Heatmap(
-        z=mat.values, x=tf_labels, y=genres,
+        z=mat.values, x=tf_labels, y=y_labels,   # ← pakai y_labels berklaster
         colorscale="Purples",
         text=text_mat.values, texttemplate="%{text}",
         textfont=dict(size=10, color="#1A1A1A"),
@@ -448,7 +457,7 @@ def _tab_heatmap_genre(df):
     ))
     fig.update_layout(**pb(
         max(340, n_genre * 32),
-        margin=dict(l=160, r=20, t=32, b=90),
+        margin=dict(l=190, r=20, t=32, b=90),
         yaxis=dict(autorange="reversed"),
         xaxis=dict(tickangle=-30),
         xaxis_title="", yaxis_title="",
@@ -468,10 +477,12 @@ def _tab_heatmap_genre(df):
         if sub.empty:
             continue
         tc_g = sub[cat_col].map(TYPEFACE_ID).value_counts(normalize=True)
+        # ── PERBAIKAN: pakai label berklaster pada kolom Genre ────────────
+        genre_display = _klaster_label(g)
         for k in tf_keys:
             lbl = TYPEFACE_ID[k]
             rows_diff.append({
-                "Genre": g,
+                "Genre": genre_display,
                 "Typeface": lbl,
                 "Delta": tc_g.get(lbl, 0) - tc_all.get(lbl, 0),
             })
@@ -486,6 +497,7 @@ def _tab_heatmap_genre(df):
         fig_d.add_vline(x=0, line_dash="dash", line_color="rgba(128,128,128,.35)")
         fig_d.update_layout(
             **pb(max(300, n_genre * 55)),
+            margin=dict(l=190, r=20, t=28, b=8),
             xaxis_title="Selisih proporsi vs korpus", yaxis_title="",
             legend=dict(orientation="h", y=-.18, font=dict(size=9)),
         )
@@ -504,6 +516,8 @@ def _tab_per_genre(df):
         sel_genre = st.selectbox(
             "Pilih genre",
             options=genre_opts,
+            # ── PERBAIKAN: tampilkan label berklaster di dropdown ──────────
+            format_func=_klaster_label,
             key="tf_per_genre_sel",
         )
     with col_g2:
@@ -528,10 +542,20 @@ def _tab_per_genre(df):
         st.info(f"Tidak ada data untuk genre *{sel_genre}*.")
         return
 
+    # ── PERBAIKAN: tampilkan label berklaster di header ───────────────────
+    kl_obj = GENRE_KLASTER_MAP_LOCAL.get(sel_genre)
+    kl_badge = ""
+    if kl_obj:
+        kl_badge = (
+            f'<span style="background:{kl_obj["bg"]};color:{kl_obj["color"]};'
+            f'border-radius:8px;padding:1px 8px;font-size:.68rem;font-weight:600;'
+            f'margin-left:8px;">[{kl_obj["id"]}] {kl_obj["label"].split("—")[1].strip()}</span>'
+        )
+
     st.markdown(
         f'<div style="padding:6px 14px;background:#F3E5F5;border-left:4px solid #8E24AA;'
         f'border-radius:0 8px 8px 0;margin:.5rem 0;">'
-        f'<b style="color:#6A1B9A;">{sel_genre}</b>'
+        f'<b style="color:#6A1B9A;">{sel_genre}</b>{kl_badge}'
         f'<span style="font-size:.72rem;color:#888;margin-left:10px;">'
         f'{n_total_g:,} buku total · {n_known_g:,} terklasifikasi typeface</span>'
         f'</div>',
@@ -587,7 +611,6 @@ def _tab_per_genre(df):
             if top_fonts.empty:
                 st.caption("—")
             else:
-                # Annotate dengan kategori
                 font_cats = {}
                 for fn in top_fonts.index:
                     sub_f = df_g[df_g["tipe_font"] == fn]
@@ -624,7 +647,6 @@ def _tab_per_genre(df):
         sub_tk = df_g_img[df_g_img["typeface_kategori"] == tk]
         if sub_tk.empty:
             continue
-        # Prioritaskan high conf, lalu skor tertinggi
         high = sub_tk[sub_tk["typeface_low_conf"].astype(str).str.upper() == "FALSE"]
         pool = high if not high.empty else sub_tk
         best = pool.sort_values("ocr_confidence", ascending=False).iloc[0]
@@ -677,7 +699,6 @@ def _tab_font_spesifik(df):
 
     st.markdown("**Font Terbanyak di Seluruh Dataset**")
 
-    # Pilih lapisan
     lapisan_fs = st.radio(
         "Lapisan",
         ["Semua buku", "Hanya terklasifikasi", "High confidence"],
@@ -700,7 +721,6 @@ def _tab_font_spesifik(df):
         st.caption("Tidak ada data.")
         return
 
-    # Warnai berdasarkan kategori
     font_cat_map = {}
     for fn in top_fonts.index:
         sub_f = df_fs[df_fs["tipe_font"] == fn]
@@ -755,7 +775,6 @@ def _tab_font_spesifik(df):
         unsafe_allow_html=True,
     )
 
-    # Distribusi genre untuk font ini
     fa, fb = st.columns(2)
     with fa:
         st.markdown("**Genre Terbanyak**")
@@ -766,7 +785,11 @@ def _tab_font_spesifik(df):
         EXCL = {"Sastra Indonesia", "Sastra", "Fiksi"}
         top_g = [(g, n) for g, n in gc.most_common(10) if g not in EXCL]
         if top_g:
-            gdf = pd.DataFrame(top_g, columns=["Genre", "N"])
+            # ── PERBAIKAN: label berklaster pada genre di chart font ──────
+            gdf = pd.DataFrame(
+                [(_klaster_label(g), n) for g, n in top_g],
+                columns=["Genre", "N"]
+            )
             fig_gf = px.bar(gdf, x="N", y="Genre", orientation="h",
                             color_discrete_sequence=[clr_font], text="N")
             fig_gf.update_layout(**pb(240), showlegend=False,
@@ -935,7 +958,6 @@ def _tab_cari(df):
                     if url else titl
                 )
 
-                # OCR text snippet
                 ocr_t = str(row.get("ocr_text", "") or "").strip()
                 ocr_snip = f'<div style="font-size:.57rem;color:#888;opacity:.7;margin-top:2px;font-style:italic;">OCR: {ocr_t[:40]}…</div>' if len(ocr_t) > 4 else ""
 
@@ -981,7 +1003,6 @@ def _tab_klaster_genre(df):
         unsafe_allow_html=False,
     )
 
-    # Opsi lapisan data
     col_lp, col_ng = st.columns([3, 1])
     with col_lp:
         lapisan = st.radio(
@@ -1005,17 +1026,14 @@ def _tab_klaster_genre(df):
 
     st.caption(f"n = {len(df_kl):,} buku dalam lapisan ini")
 
-    # Statistik ringkas per klaster (cards di atas)
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
     kl_cols = st.columns(3)
     for kc, kl in zip(kl_cols, KLASTER_COOC):
-        # Hitung buku yang masuk klaster ini
         genre_lists_all = expand_genres(df_kl["GENRES"], normalize=True)
         kl_genres_set = set(kl["genres"])
         mask_kl = [bool(kl_genres_set & set(gl)) for gl in genre_lists_all]
         n_kl = sum(mask_kl)
         df_kl_sub = df_kl[mask_kl]
-        # Typeface dominan
         top_tf = df_kl_sub["typeface_kategori"].mode()
         top_tf_str = TYPEFACE_ID.get(top_tf.iloc[0], "—") if len(top_tf) > 0 else "—"
         top_tf_clr = TYPEFACE_CLR.get(top_tf.iloc[0], "#888") if len(top_tf) > 0 else "#888"
@@ -1035,7 +1053,6 @@ def _tab_klaster_genre(df):
                 unsafe_allow_html=True,
             )
 
-    # ── Loop per klaster: analisis mendalam ─────────────────────────────────
     genre_lists_global = expand_genres(df_kl["GENRES"], normalize=True)
     tc_all_global = df_kl["typeface_kategori"].map(TYPEFACE_ID).value_counts(normalize=True)
 
@@ -1050,7 +1067,6 @@ def _tab_klaster_genre(df):
             unsafe_allow_html=True,
         )
 
-        # Buku yang punya setidaknya satu genre dari klaster ini
         kl_genres_set = set(kl["genres"])
         mask_kl = [bool(kl_genres_set & set(gl)) for gl in genre_lists_global]
         df_kl_sub = df_kl[mask_kl].copy()
@@ -1062,7 +1078,6 @@ def _tab_klaster_genre(df):
 
         col_a, col_b = st.columns(2)
 
-        # ── Pie distribusi typeface klaster ──────────────────────────────────
         with col_a:
             st.markdown("**Distribusi Typeface dalam Klaster**")
             tc_kl = df_kl_sub["typeface_kategori"].map(TYPEFACE_ID).value_counts()
@@ -1075,7 +1090,6 @@ def _tab_klaster_genre(df):
             fig_pie_kl.update_traces(textinfo="percent+label", textfont_size=9)
             st.plotly_chart(fig_pie_kl, use_container_width=True)
 
-        # ── Simpangan klaster vs korpus ──────────────────────────────────────
         with col_b:
             st.markdown("**Simpangan Klaster vs Korpus**")
             st.caption("Positif = typeface lebih banyak di klaster ini vs rata-rata semua buku.")
@@ -1096,7 +1110,6 @@ def _tab_klaster_genre(df):
 
         # ── Heatmap typeface × genre dalam klaster ───────────────────────────
         st.markdown("**Heatmap Typeface × Genre dalam Klaster**")
-        # Hanya genre yang ada di klaster DAN ada di data
         genres_in_kl = kl["genres"]
         genre_lists_sub = expand_genres(df_kl_sub["GENRES"], normalize=True)
 
@@ -1117,20 +1130,20 @@ def _tab_klaster_genre(df):
         if mat_kl.empty:
             st.caption("Data genre tidak cukup untuk heatmap.")
         else:
-            # Hitung n per genre untuk label
             n_per_genre = {}
             for g in valid_genres:
                 mask_g2 = [g in gl for gl in genre_lists_sub]
                 n_per_genre[g] = sum(mask_g2)
 
-            y_labels_kl = [f"{g} (n={n_per_genre.get(g,0)})" for g in valid_genres]
+            # ── PERBAIKAN: y-labels di heatmap klaster pakai label berklaster ──
+            y_labels_kl = [f"{_klaster_label(g)} (n={n_per_genre.get(g,0)})" for g in valid_genres]
+
             text_mat_kl = (mat_kl * 100).round(0).astype(int).astype(str) + "%"
-            # Pilih colorscale sesuai klaster
             cscale = {"K1": "Blues", "K2": "RdPu", "K3": "Greens"}.get(kl["id"], "Purples")
             fig_hm_kl = go.Figure(data=go.Heatmap(
                 z=mat_kl.values,
                 x=[TYPEFACE_ID[k] for k in TF_ANALISIS],
-                y=y_labels_kl,
+                y=y_labels_kl,       # ← pakai label berklaster
                 colorscale=cscale,
                 text=text_mat_kl.values,
                 texttemplate="%{text}",
@@ -1139,7 +1152,7 @@ def _tab_klaster_genre(df):
             ))
             fig_hm_kl.update_layout(**pb(
                 max(260, len(valid_genres) * 36),
-                margin=dict(l=200, r=20, t=32, b=90),
+                margin=dict(l=220, r=20, t=32, b=90),
                 yaxis=dict(autorange="reversed"),
                 xaxis=dict(tickangle=-30),
                 xaxis_title="", yaxis_title="",
@@ -1258,7 +1271,6 @@ def _tab_klaster_genre(df):
         )
         st.plotly_chart(fig_cmp, use_container_width=True)
 
-        # Tabel ringkas
         pivot = df_compare.pivot(index="Typeface", columns="Klaster", values="Proporsi")
         pivot = pivot.sort_values(by=pivot.columns[0], ascending=False)
         styled_rows = []
@@ -1296,7 +1308,7 @@ def _tab_klaster_genre(df):
         st.caption("Proporsi typeface (%) di dalam setiap klaster genre.")
 
 
-
+# ── Entry point ────────────────────────────────────────────────────────────────
 
 def render_tipografi(DF):
     """
@@ -1314,7 +1326,7 @@ def render_tipografi(DF):
         unsafe_allow_html=False,
     )
 
-    # ── Enam kategori typeface — kartu ────────────────────────────────────────
+    # ── Kartu tujuh kategori typeface ────────────────────────────────────────
     _section_header(
         "Tujuh Kategori Typeface (Lupton 2024)",
         "Dari Humanist Serif hingga Display/Dekoratif",
