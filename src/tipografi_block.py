@@ -496,8 +496,7 @@ def _tab_heatmap_genre(df):
         )
         fig_d.add_vline(x=0, line_dash="dash", line_color="rgba(128,128,128,.35)")
         fig_d.update_layout(
-            **pb(max(300, n_genre * 55)),
-            margin=dict(l=190, r=20, t=28, b=8),
+            **pb(max(300, n_genre * 55), margin=dict(l=200, r=20, t=28, b=50)),
             xaxis_title="Selisih proporsi vs korpus", yaxis_title="",
             legend=dict(orientation="h", y=-.18, font=dict(size=9)),
         )
