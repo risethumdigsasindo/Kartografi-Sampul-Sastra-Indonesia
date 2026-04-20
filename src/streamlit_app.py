@@ -159,9 +159,9 @@ KLASTER_COOC = [
     {
         "id":"K3","label":"Klaster 3 — Eskapisme: fantasi, aksi & ketegangan",
         "short":"Klaster 3","color":"#1D9E75","bg":"#EEF8F4",
-        "genres":["Fantasi","Fiksi Sejarah","Petualangan","Aksi","Fiksi Sains","Thriller/Misteri","Horor","Anak-anak"],
-        "pairs":[("Fantasi","Fiksi Sains"),("Fantasi","Petualangan"),("Aksi","Fantasi"),
-                 ("Aksi","Petualangan"),("Horor","Thriller/Misteri"),("Fiksi Sejarah","Novel")],
+        "genres":["Fantasi","Fiksi Sejarah","Petualangan","Anak-anak","Fiksi Sains","Thriller/Misteri","Horor","Anak-anak"],
+        "pairs":[("Fantasi","Fiksi Sains"),("Fantasi","Petualangan"),("Anak-anak","Fantasi"),
+                 ("Anak-anak","Petualangan"),("Horor","Thriller/Misteri"),("Fiksi Sejarah","Novel")],
     },
 ]
 GENRE_KLASTER_MAP = {}
