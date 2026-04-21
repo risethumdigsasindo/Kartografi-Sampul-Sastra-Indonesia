@@ -19,6 +19,13 @@ Kolom v5 yang tersedia di DF:
   clip_margin        : selisih skor top-1 vs top-2
 
 Panggil render_tipografi(DF) dari app utama di blok elif HAL == "Tipografi".
+
+CHANGELOG:
+  - FIX: "Romansa Kontemporer" ditambahkan ke GENRE_NORM lokal di expand_genres()
+    (sebelumnya hanya "Roman Kontemporer" yang ada → Romansa Kontemporer lolos
+    sebagai genre tersendiri dan tidak bergabung ke bucket "Romansa")
+  - FIX: threshold _top_genres() diturunkan dari 5 → 3 agar genre kecil seper
+    "Anak-anak" tidak menghilang setelah filter typeface_kategori != unknown
 """
 
 import streamlit as st
@@ -197,22 +204,46 @@ def _konfidence_badge(match_type, low_conf):
 
 
 def expand_genres(series, normalize=True):
-    # Sinkron penuh dengan GENRE_NORM di app.py
+    """
+    Parse dan normalisasi kolom GENRES (comma-separated).
+
+    FIX: "Romansa Kontemporer" ditambahkan secara eksplisit ke GENRE_NORM.
+    Sebelumnya hanya "Roman Kontemporer" yang ada, sehingga "Romansa Kontemporer"
+    lolos sebagai genre tersendiri dan tidak bergabung ke bucket "Romansa".
+    Setelah fix ini, proporsi "Romansa" naik dan tidak ada duplikasi dengan
+    varian nama lainnya.
+    """
     GENRE_NORM = {
-        "Cinta": "Romansa", "Roman": "Romansa",
-        "Romansa Kontemporer": "Romansa", "Roman Kontemporer": "Romansa",
-        "Kontemporer": "Romansa", "Romansatic": "Romansa",
-        "Young Adult Romansace": "Romansa",
-        "Thriller": "Thriller/Misteri", "Misteri": "Thriller/Misteri",
-        "Misteri Thriller": "Thriller/Misteri", "Thriller Suspense": "Thriller/Misteri",
-        "Psychological Thriller": "Thriller/Misteri", "Suspense": "Thriller/Misteri",
-        "Detective": "Thriller/Misteri", "Kriminal": "Thriller/Misteri",
-        "Supranatural": "Horor", "Humor": "Komedi",
-        "New Adult": "Remaja",
-        "Collections": "Antologi", "Middle Grade": "Fantasi",
-        "Fiksi Ilmiah": "Fiksi Sains", "Distopia": "Fiksi Sains",
-        "Sejarah": "Fiksi Sejarah", "Historical Fiction": "Fiksi Sejarah",
-        "Historical": "Fiksi Sejarah",
+        # ── Romansa & variannya ──────────────────────────────────────────────
+        "Cinta":                "Romansa",
+        "Roman":                "Romansa",
+        "Romansa Kontemporer":  "Romansa",   # ← FIX: sebelumnya hilang
+        "Roman Kontemporer":    "Romansa",
+        "Romantis":             "Romansa",
+        "Romance":              "Romansa",
+        "Kontemporer":          "Romansa",
+        "Romansatic":           "Romansa",
+        "Young Adult Romansace":"Romansa",
+        # ── Thriller & Misteri ───────────────────────────────────────────────
+        "Thriller":             "Thriller/Misteri",
+        "Misteri":              "Thriller/Misteri",
+        "Misteri Thriller":     "Thriller/Misteri",
+        "Thriller Suspense":    "Thriller/Misteri",
+        "Psychological Thriller":"Thriller/Misteri",
+        "Suspense":             "Thriller/Misteri",
+        "Detective":            "Thriller/Misteri",
+        "Kriminal":             "Thriller/Misteri",
+        # ── Lainnya ──────────────────────────────────────────────────────────
+        "Supranatural":         "Horor",
+        "Humor":                "Komedi",
+        "New Adult":            "Remaja",
+        "Collections":          "Antologi",
+        "Middle Grade":         "Fantasi",
+        "Fiksi Ilmiah":         "Fiksi Sains",
+        "Distopia":             "Fiksi Sains",
+        "Sejarah":              "Fiksi Sejarah",
+        "Historical Fiction":   "Fiksi Sejarah",
+        "Historical":           "Fiksi Sejarah",
     }
     out = []
     for v in series:
@@ -234,13 +265,23 @@ def expand_genres(series, normalize=True):
 
 
 def _top_genres(df, n=16):
+    """
+    Kembalikan top-N genre setelah normalisasi.
+
+    FIX: threshold diturunkan dari 5 → 3.
+    Sebelumnya, setelah filter typeface_kategori != unknown, genre dengan
+    populasi kecil (mis. "Anak-anak") bisa turun di bawah threshold 5
+    sehingga tidak muncul di heatmap. Threshold 3 konsisten dengan threshold
+    yang digunakan di heatmap_warna_genre() dan heatmap_gaya_genre() di app.py.
+    """
     from collections import Counter
     GENRE_EXCLUDE = {"Sastra Indonesia", "Sastra", "Fiksi", "Nonfiction", "Non-fiction",
                      "Nonfiksi", "Non Fiksi", "Non-fiksi"}
     c = Counter()
     for gl in expand_genres(df["GENRES"], normalize=True):
         c.update(gl)
-    return [g for g, cnt in c.most_common() if g not in GENRE_EXCLUDE and cnt >= 5][:n]
+    # ← threshold 3 (sebelumnya 5)
+    return [g for g, cnt in c.most_common() if g not in GENRE_EXCLUDE and cnt >= 3][:n]
 
 
 def _genre_mask(df, genre):
@@ -431,7 +472,6 @@ def _tab_heatmap_genre(df):
     tf_keys = TF_ANALISIS
     tf_labels = [TYPEFACE_ID[k] for k in tf_keys]
 
-    # ── PERBAIKAN: buat y_labels dengan suffix klaster ────────────────────
     y_labels = [_klaster_label(g) for g in genres]
 
     mat = pd.DataFrame(0.0, index=genres, columns=tf_labels)
@@ -449,7 +489,7 @@ def _tab_heatmap_genre(df):
     text_mat = (mat * 100).round(0).astype(int).astype(str) + "%"
 
     fig = go.Figure(data=go.Heatmap(
-        z=mat.values, x=tf_labels, y=y_labels,   # ← pakai y_labels berklaster
+        z=mat.values, x=tf_labels, y=y_labels,
         colorscale="Purples",
         text=text_mat.values, texttemplate="%{text}",
         textfont=dict(size=10, color="#1A1A1A"),
@@ -477,7 +517,6 @@ def _tab_heatmap_genre(df):
         if sub.empty:
             continue
         tc_g = sub[cat_col].map(TYPEFACE_ID).value_counts(normalize=True)
-        # ── PERBAIKAN: pakai label berklaster pada kolom Genre ────────────
         genre_display = _klaster_label(g)
         for k in tf_keys:
             lbl = TYPEFACE_ID[k]
@@ -515,7 +554,6 @@ def _tab_per_genre(df):
         sel_genre = st.selectbox(
             "Pilih genre",
             options=genre_opts,
-            # ── PERBAIKAN: tampilkan label berklaster di dropdown ──────────
             format_func=_klaster_label,
             key="tf_per_genre_sel",
         )
@@ -541,7 +579,6 @@ def _tab_per_genre(df):
         st.info(f"Tidak ada data untuk genre *{sel_genre}*.")
         return
 
-    # ── PERBAIKAN: tampilkan label berklaster di header ───────────────────
     kl_obj = GENRE_KLASTER_MAP_LOCAL.get(sel_genre)
     kl_badge = ""
     if kl_obj:
@@ -784,7 +821,6 @@ def _tab_font_spesifik(df):
         EXCL = {"Sastra Indonesia", "Sastra", "Fiksi"}
         top_g = [(g, n) for g, n in gc.most_common(10) if g not in EXCL]
         if top_g:
-            # ── PERBAIKAN: label berklaster pada genre di chart font ──────
             gdf = pd.DataFrame(
                 [(_klaster_label(g), n) for g, n in top_g],
                 columns=["Genre", "N"]
@@ -886,98 +922,7 @@ def _tab_font_spesifik(df):
     st.plotly_chart(fig_ct, use_container_width=True)
 
 
-# ── Tab 5: Cari Buku ───────────────────────────────────────────────────────────
-
-def _tab_cari(df):
-    """Filter buku berdasarkan kriteria tipografi."""
-
-    c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
-    with c1:
-        q = st.text_input("Judul / penulis", key="tf_cari_q")
-    with c2:
-        tf_sel = st.selectbox(
-            "Typeface",
-            ["Semua"] + [TYPEFACE_ID[k] for k in TF_ANALISIS],
-            key="tf_cari_tf",
-        )
-    with c3:
-        font_sel = st.selectbox(
-            "Font spesifik",
-            ["Semua"] + sorted(df["tipe_font"].dropna().unique().tolist()),
-            key="tf_cari_font",
-        )
-    with c4:
-        only_hc = st.checkbox("High conf saja", key="tf_cari_hc")
-    with c4:
-        n_show = st.slider("Tampilkan", 4, 32, 8, 4, key="tf_cari_n")
-
-    dt = df[df["image_ok"].astype(str).str.upper() == "TRUE"].copy()
-
-    if q:
-        ql = q.lower()
-        dt = dt[
-            dt["TITLE"].str.lower().str.contains(ql, na=False) |
-            dt["AUTHOR"].str.lower().str.contains(ql, na=False)
-        ]
-    if tf_sel != "Semua":
-        tf_rev = {v: k for k, v in TYPEFACE_ID.items()}
-        dt = dt[dt["typeface_kategori"] == tf_rev.get(tf_sel, tf_sel)]
-    if font_sel != "Semua":
-        dt = dt[dt["tipe_font"] == font_sel]
-    if only_hc:
-        dt = dt[dt["typeface_low_conf"].astype(str).str.upper() == "FALSE"]
-
-    st.markdown(f"**{len(dt):,} buku ditemukan**")
-
-    if dt.empty:
-        st.info("Tidak ada buku yang cocok.")
-        return
-
-    dt = dt.head(n_show).reset_index(drop=True)
-    n_cols = 4
-    for start in range(0, len(dt), n_cols):
-        chunk = dt.iloc[start:start + n_cols]
-        cols  = st.columns(n_cols)
-        for j, (_, row) in enumerate(chunk.iterrows()):
-            with cols[j]:
-                cp = cover_path(row.get("IMAGE_FILE"))
-                if cp:
-                    st.image(cp, use_container_width=True)
-
-                tk    = str(row.get("typeface_kategori", "unknown") or "unknown")
-                clr   = TYPEFACE_CLR.get(tk, "#999")
-                mt    = str(row.get("match_type", "") or "")
-                lc    = str(row.get("typeface_low_conf", "")).upper() == "TRUE"
-                fn    = str(row.get("tipe_font", "—") or "—")
-                url   = str(row.get("URL", "") or "")
-                titl  = str(row.get("TITLE", "–"))
-                year  = int(row["YEAR"]) if row.get("YEAR", 0) and int(row.get("YEAR", 0)) > 0 else "–"
-                titl_h = (
-                    f'<a href="{url}" target="_blank" style="text-decoration:none;color:inherit;">{titl}</a>'
-                    if url else titl
-                )
-
-                ocr_t = str(row.get("ocr_text", "") or "").strip()
-                ocr_snip = f'<div style="font-size:.57rem;color:#888;opacity:.7;margin-top:2px;font-style:italic;">OCR: {ocr_t[:40]}…</div>' if len(ocr_t) > 4 else ""
-
-                st.markdown(
-                    f'<div style="border:1px solid rgba(128,128,128,.12);'
-                    f'border-top:3px solid {clr};border-radius:0 0 8px 8px;'
-                    f'padding:.4rem .5rem .5rem;font-size:.63rem;">'
-                    f'<span style="background:{clr}18;color:{clr};border-radius:5px;'
-                    f'padding:1px 5px;font-size:.58rem;font-weight:600;">'
-                    f'{TYPEFACE_ID.get(tk, tk)}</span><br>'
-                    f'<span style="font-size:.68rem;font-weight:600;margin:.15rem 0 .05rem;display:block;">{titl_h}</span>'
-                    f'<span style="opacity:.55;">{row.get("AUTHOR","–")} · {year}</span><br>'
-                    f'<span style="opacity:.6;">{fn}</span><br>'
-                    f'{_konfidence_badge(mt, lc)}'
-                    f'{ocr_snip}'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-
-
-# ── Tab 6: Tipografi × Klaster Genre ──────────────────────────────────────────
+# ── Tab 5: Klaster Genre ──────────────────────────────────────────────────────
 
 def _tab_klaster_genre(df):
     """
@@ -1134,7 +1079,6 @@ def _tab_klaster_genre(df):
                 mask_g2 = [g in gl for gl in genre_lists_sub]
                 n_per_genre[g] = sum(mask_g2)
 
-            # ── PERBAIKAN: y-labels di heatmap klaster pakai label berklaster ──
             y_labels_kl = [f"{_klaster_label(g)} (n={n_per_genre.get(g,0)})" for g in valid_genres]
 
             text_mat_kl = (mat_kl * 100).round(0).astype(int).astype(str) + "%"
@@ -1142,7 +1086,7 @@ def _tab_klaster_genre(df):
             fig_hm_kl = go.Figure(data=go.Heatmap(
                 z=mat_kl.values,
                 x=[TYPEFACE_ID[k] for k in TF_ANALISIS],
-                y=y_labels_kl,       # ← pakai label berklaster
+                y=y_labels_kl,
                 colorscale=cscale,
                 text=text_mat_kl.values,
                 texttemplate="%{text}",
@@ -1305,6 +1249,97 @@ def _tab_klaster_genre(df):
             unsafe_allow_html=True,
         )
         st.caption("Proporsi typeface (%) di dalam setiap klaster genre.")
+
+
+# ── Tab 6: Cari Buku ───────────────────────────────────────────────────────────
+
+def _tab_cari(df):
+    """Filter buku berdasarkan kriteria tipografi."""
+
+    c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
+    with c1:
+        q = st.text_input("Judul / penulis", key="tf_cari_q")
+    with c2:
+        tf_sel = st.selectbox(
+            "Typeface",
+            ["Semua"] + [TYPEFACE_ID[k] for k in TF_ANALISIS],
+            key="tf_cari_tf",
+        )
+    with c3:
+        font_sel = st.selectbox(
+            "Font spesifik",
+            ["Semua"] + sorted(df["tipe_font"].dropna().unique().tolist()),
+            key="tf_cari_font",
+        )
+    with c4:
+        only_hc = st.checkbox("High conf saja", key="tf_cari_hc")
+    with c4:
+        n_show = st.slider("Tampilkan", 4, 32, 8, 4, key="tf_cari_n")
+
+    dt = df[df["image_ok"].astype(str).str.upper() == "TRUE"].copy()
+
+    if q:
+        ql = q.lower()
+        dt = dt[
+            dt["TITLE"].str.lower().str.contains(ql, na=False) |
+            dt["AUTHOR"].str.lower().str.contains(ql, na=False)
+        ]
+    if tf_sel != "Semua":
+        tf_rev = {v: k for k, v in TYPEFACE_ID.items()}
+        dt = dt[dt["typeface_kategori"] == tf_rev.get(tf_sel, tf_sel)]
+    if font_sel != "Semua":
+        dt = dt[dt["tipe_font"] == font_sel]
+    if only_hc:
+        dt = dt[dt["typeface_low_conf"].astype(str).str.upper() == "FALSE"]
+
+    st.markdown(f"**{len(dt):,} buku ditemukan**")
+
+    if dt.empty:
+        st.info("Tidak ada buku yang cocok.")
+        return
+
+    dt = dt.head(n_show).reset_index(drop=True)
+    n_cols = 4
+    for start in range(0, len(dt), n_cols):
+        chunk = dt.iloc[start:start + n_cols]
+        cols  = st.columns(n_cols)
+        for j, (_, row) in enumerate(chunk.iterrows()):
+            with cols[j]:
+                cp = cover_path(row.get("IMAGE_FILE"))
+                if cp:
+                    st.image(cp, use_container_width=True)
+
+                tk    = str(row.get("typeface_kategori", "unknown") or "unknown")
+                clr   = TYPEFACE_CLR.get(tk, "#999")
+                mt    = str(row.get("match_type", "") or "")
+                lc    = str(row.get("typeface_low_conf", "")).upper() == "TRUE"
+                fn    = str(row.get("tipe_font", "—") or "—")
+                url   = str(row.get("URL", "") or "")
+                titl  = str(row.get("TITLE", "–"))
+                year  = int(row["YEAR"]) if row.get("YEAR", 0) and int(row.get("YEAR", 0)) > 0 else "–"
+                titl_h = (
+                    f'<a href="{url}" target="_blank" style="text-decoration:none;color:inherit;">{titl}</a>'
+                    if url else titl
+                )
+
+                ocr_t = str(row.get("ocr_text", "") or "").strip()
+                ocr_snip = f'<div style="font-size:.57rem;color:#888;opacity:.7;margin-top:2px;font-style:italic;">OCR: {ocr_t[:40]}…</div>' if len(ocr_t) > 4 else ""
+
+                st.markdown(
+                    f'<div style="border:1px solid rgba(128,128,128,.12);'
+                    f'border-top:3px solid {clr};border-radius:0 0 8px 8px;'
+                    f'padding:.4rem .5rem .5rem;font-size:.63rem;">'
+                    f'<span style="background:{clr}18;color:{clr};border-radius:5px;'
+                    f'padding:1px 5px;font-size:.58rem;font-weight:600;">'
+                    f'{TYPEFACE_ID.get(tk, tk)}</span><br>'
+                    f'<span style="font-size:.68rem;font-weight:600;margin:.15rem 0 .05rem;display:block;">{titl_h}</span>'
+                    f'<span style="opacity:.55;">{row.get("AUTHOR","–")} · {year}</span><br>'
+                    f'<span style="opacity:.6;">{fn}</span><br>'
+                    f'{_konfidence_badge(mt, lc)}'
+                    f'{ocr_snip}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
