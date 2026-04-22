@@ -1341,7 +1341,411 @@ def _tab_cari(df):
                     unsafe_allow_html=True,
                 )
 
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB BARU: _tab_pipeline_diagram
+# Sisipkan ke tipografi_block.py:
+#   1. Paste fungsi ini sebelum baris "def render_tipografi(DF):"
+#   2. Tambahkan tab baru di render_tipografi() — lihat bagian bawah file ini
+# ══════════════════════════════════════════════════════════════════════════════
 
+def _tab_pipeline_diagram(df):
+    """
+    Tab 7: Diagram Pipeline v5 — Interaktif.
+    User memilih satu buku dari dataset; diagram langsung menampilkan
+    alur lengkap OCR → Edit Distance → CLIP → hasil untuk buku tersebut.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import FancyBboxPatch
+    import numpy as np
+    from PIL import Image
+    import io
+
+    # ── helpers ───────────────────────────────────────────────────────────────
+    BG    = "#F8F8F6"; WHITE = "#FFFFFF"; DARK  = "#1A1A2E"
+    GREY  = "#6B7280"; LGREY = "#E5E7EB"; DGREY = "#374151"
+
+    ACC_MAP = {
+        "modern_serif":       ("#7B3F9E", "#F3E5F5", "#9C6FB5"),
+        "humanist_serif":     ("#3949AB", "#EDE7F6", "#5C6BC0"),
+        "transitional_serif": ("#512DA8", "#EDE7F6", "#7E57C2"),
+        "slab_serif":         ("#AD1457", "#FCE4EC", "#D81B60"),
+        "sans_serif":         ("#1565C0", "#E3F2FD", "#1976D2"),
+        "script":             ("#00695C", "#E0F2F1", "#00897B"),
+        "display":            ("#E65100", "#FFF3E0", "#F57C00"),
+        "unknown":            ("#546E7A", "#ECEFF1", "#78909C"),
+    }
+
+    def get_accent(cat):
+        return ACC_MAP.get(str(cat), ACC_MAP["unknown"])
+
+    def rbox(ax, x, y, w, h, fc, ec, lw=1.0, r=3):
+        ax.add_patch(FancyBboxPatch((x, y), w, h,
+            boxstyle=f"round,pad=0,rounding_size={r}",
+            facecolor=fc, edgecolor=ec, linewidth=lw, clip_on=False))
+
+    # ── UI controls ───────────────────────────────────────────────────────────
+    _section_header(
+        "Diagram Pipeline v5 — Per Buku",
+        "Pilih buku untuk melihat alur OCR → Edit Distance → CLIP → hasil secara visual.",
+        color="#37474F", bg="#ECEFF1",
+    )
+
+    df_img = df[df["image_ok"].astype(str).str.upper() == "TRUE"].copy()
+
+    col_s1, col_s2, col_s3 = st.columns([3, 2, 2])
+    with col_s1:
+        search_q = st.text_input(
+            "Cari judul / penulis",
+            key="pd_search",
+            placeholder="mis. Laut Bercerita, Leila…",
+        )
+    with col_s2:
+        tf_filter = st.selectbox(
+            "Filter typeface",
+            ["Semua"] + [TYPEFACE_ID[k] for k in TF_ANALISIS] + ["Tidak Terklasifikasi"],
+            key="pd_tf_filter",
+        )
+    with col_s3:
+        conf_filter = st.radio(
+            "Confidence",
+            ["Semua", "High conf", "Low conf"],
+            key="pd_conf",
+            horizontal=True,
+        )
+
+    df_sel = df_img.copy()
+    if search_q:
+        ql = search_q.lower()
+        df_sel = df_sel[
+            df_sel["title"].str.lower().str.contains(ql, na=False) |
+            df_sel["AUTHOR"].str.lower().str.contains(ql, na=False)
+        ]
+    if tf_filter != "Semua":
+        tf_rev = {v: k for k, v in TYPEFACE_ID.items()}
+        target = tf_rev.get(tf_filter, "unknown")
+        df_sel = df_sel[df_sel["typeface_kategori"] == target]
+    if conf_filter == "High conf":
+        df_sel = df_sel[df_sel["typeface_low_conf"].astype(str).str.upper() == "FALSE"]
+    elif conf_filter == "Low conf":
+        df_sel = df_sel[df_sel["typeface_low_conf"].astype(str).str.upper() == "TRUE"]
+
+    if df_sel.empty:
+        st.info("Tidak ada buku yang sesuai filter.")
+        return
+
+    book_options = df_sel["title"].tolist()
+    sel_title = st.selectbox(
+        f"Pilih buku ({len(df_sel):,} tersedia)",
+        options=book_options,
+        key="pd_book_sel",
+    )
+
+    row = df_sel[df_sel["title"] == sel_title].iloc[0]
+    acc, alt, med = get_accent(row.get("typeface_kategori", "unknown"))
+
+    # ── info strip ────────────────────────────────────────────────────────────
+    tf_lbl   = TYPEFACE_ID.get(str(row.get("typeface_kategori", "unknown")), "?")
+    low_conf = str(row.get("typeface_low_conf", "")).upper() == "TRUE"
+    mt       = str(row.get("match_type", "") or "")
+    conf_lbl = "Low Confidence" if low_conf else "High Confidence"
+    conf_col = "#B71C1C" if low_conf else "#1B5E20"
+
+    st.markdown(
+        f'<div style="background:{alt};border-left:4px solid {acc};'
+        f'border-radius:0 8px 8px 0;padding:8px 16px;margin:.5rem 0 1rem;">'
+        f'<b style="font-size:.95rem;color:{acc};">{sel_title}</b>'
+        f'<span style="font-size:.75rem;color:{DGREY};margin-left:10px;">'
+        f'{row.get("AUTHOR","—")} · {int(row.get("YEAR",0)) if row.get("YEAR",0) else "—"}</span><br>'
+        f'<span style="font-size:.72rem;">Typeface: <b style="color:{acc};">{tf_lbl}</b>'
+        f' &nbsp;|&nbsp; Font: <b>{str(row.get("tipe_font","—"))}</b>'
+        f' &nbsp;|&nbsp; Match: <b>{mt}</b>'
+        f' &nbsp;|&nbsp; <b style="color:{conf_col};">{conf_lbl}</b></span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Load cover ────────────────────────────────────────────────────────────
+    img_path = cover_path(row.get("IMAGE_FILE"))
+    cover_arr = None
+    if img_path:
+        try:
+            cover_arr = np.array(Image.open(img_path))
+        except Exception:
+            cover_arr = None
+
+    # ── Build figure ──────────────────────────────────────────────────────────
+    fig, ax = plt.subplots(1, 1, figsize=(18, 8))
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+    ax.set_xlim(0, 100); ax.set_ylim(0, 100)
+    ax.axis("off")
+
+    TOP = 96; BOT = 6; MID = (TOP + BOT) / 2
+
+    # ── Arrows ──
+    for xp in [33.0, 56.5, 74.5]:
+        ax.annotate("", xy=(xp + 2, MID), xytext=(xp, MID),
+            arrowprops=dict(arrowstyle="->", color=GREY, lw=1.4))
+
+    # ── Title ──
+    ax.text(50, TOP + 2, f"Pipeline Analisis Tipografi — {sel_title}",
+        ha="center", va="bottom", fontsize=11.5, color=acc,
+        fontfamily="DejaVu Serif", style="italic", fontweight="bold")
+
+    # ── COL 1: Cover ──────────────────────────────────────────────────────────
+    cx, cy, cw, ch = 0.5, BOT + 2, 14.5, TOP - BOT - 9
+    if cover_arr is not None:
+        ax_c = ax.inset_axes([cx / 100, cy / 100, cw / 100, ch / 100])
+        ax_c.imshow(cover_arr); ax_c.axis("off")
+        ax_c.add_patch(plt.Rectangle((0, 0), 1, 1, fill=False,
+            edgecolor=acc, lw=1.8, transform=ax_c.transAxes))
+    else:
+        rbox(ax, cx, cy, cw, ch, alt, acc, lw=1.5)
+        ax.text(cx + cw / 2, cy + ch * 0.5,
+            str(sel_title)[:18], ha="center", va="center",
+            fontsize=7, color=acc, fontweight="bold")
+
+    # metadata box
+    my = BOT - 0.5
+    rbox(ax, cx, my, cw, 5.5, "#FFFDE7", "#F9A825", lw=0.8, r=3)
+    ax.text(cx + 0.6, my + 4.5, "metadata:", fontsize=5.5, color="#F57F17",
+        fontfamily="monospace", style="italic", va="top")
+    ax.text(cx + 0.6, my + 3.0,
+        f'judul  = "{str(sel_title)[:18]}"',
+        fontsize=5.0, color=DARK, fontfamily="monospace", va="top")
+    ax.text(cx + 0.6, my + 1.5,
+        f'penulis= "{str(row.get("AUTHOR",""))[:18]}"',
+        fontsize=5.0, color=DARK, fontfamily="monospace", va="top")
+
+    # arrow back from col4
+    ax.annotate("", xy=(cx + cw, my + 2.5), xytext=(57 + 8.75, my + 2.5),
+        arrowprops=dict(arrowstyle="->", color=med, lw=1.0,
+            connectionstyle="arc3,rad=0.22"))
+
+    # ── COL 2: Detection ──────────────────────────────────────────────────────
+    dx, dy, dw, dh = 17, BOT + 2, 14.5, TOP - BOT - 9
+    if cover_arr is not None:
+        ax_d = ax.inset_axes([dx / 100, dy / 100, dw / 100, dh / 100])
+        ax_d.imshow(cover_arr); ax_d.axis("off")
+        ax_d.add_patch(plt.Rectangle((0.02, 0.01), 0.76, 0.14,
+            fill=False, edgecolor="#E53935", lw=2.2, transform=ax_d.transAxes))
+        ax_d.add_patch(plt.Rectangle((0.02, 0.17), 0.90, 0.09,
+            fill=False, edgecolor="#FF8F00", lw=1.5, transform=ax_d.transAxes))
+        ax_d.add_patch(plt.Rectangle((0, 0), 1, 1, fill=False,
+            edgecolor=acc, lw=1.2, transform=ax_d.transAxes))
+    else:
+        rbox(ax, dx, dy, dw, dh, alt, acc, lw=1.2)
+        rbox(ax, dx + 0.5, dy + dh - 18, dw - 1, 8, "#FFEBEE", "#E53935", lw=1.5)
+        ax.text(dx + 1, dy + dh - 13,
+            str(sel_title)[:14], fontsize=6.5, color="#C62828", fontfamily="monospace")
+
+    # ── COL 3: OCR blocks ─────────────────────────────────────────────────────
+    ox = 34; ow = 21
+    ocr_raw   = str(row.get("ocr_text", "") or "")
+    ocr_conf  = float(row.get("ocr_confidence", 0) or 0)
+    ocr_zone  = str(row.get("ocr_zone", "full"))
+    author_str = str(row.get("AUTHOR", ""))
+
+    ocr_blocks = [
+        (ocr_raw[:28] if ocr_raw else "—", f"{ocr_conf:.2f}", True),
+        (author_str[:28],                   "—",               False),
+        (f'[zone: {ocr_zone}]',             "—",               False),
+    ]
+    bh = (TOP - BOT - 11) / len(ocr_blocks) - 1.5
+    for i, (txt_o, conf_o, is_t) in enumerate(ocr_blocks):
+        by = TOP - 9 - (i + 1) * (bh + 1.5)
+        fc = "#FFEBEE" if is_t else ("#FFF8E1" if i == 1 else WHITE)
+        ec = "#E53935" if is_t else ("#FF8F00" if i == 1 else LGREY)
+        lw = 1.6 if is_t else 0.8
+        rbox(ax, ox, by, ow, bh, fc, ec, lw)
+        ax.text(ox + 0.8, by + bh - 2.2, txt_o,
+            fontsize=7.2, color=DARK, fontfamily="monospace",
+            fontweight="bold" if is_t else "normal", va="top")
+        if conf_o != "—":
+            ax.text(ox + 0.8, by + 1.5, f"conf. {conf_o}",
+                fontsize=6, color=GREY, fontfamily="monospace", va="bottom")
+
+    # ── COL 4: Edit distance ──────────────────────────────────────────────────
+    ex = 57; ew = 17
+    title_norm = str(sel_title).lower()
+
+    # header
+    rbox(ax, ex, TOP - 10, ew, 6.5, acc, acc, lw=0, r=3)
+    ax.text(ex + ew / 2, TOP - 6.5, "candidate generation",
+        ha="center", va="center", fontsize=6.8, color=WHITE, fontweight="bold")
+
+    cands_raw = [
+        (title_norm[:20],    "0.00", True),
+        ((ocr_raw.lower()[:20] if ocr_raw.lower() != title_norm else title_norm.split()[0]), "~0.1", False),
+        (title_norm.split()[0] if " " in title_norm else title_norm, "0.4+", False),
+        (author_str.lower()[:18], "0.7+", False),
+    ]
+    rs = TOP - 12; rh = 5.0
+    for i, (ct, sc, im) in enumerate(cands_raw):
+        cy2 = rs - (i + 1) * rh
+        rbox(ax, ex, cy2, ew, rh - 0.4,
+            alt if im else WHITE, acc if im else LGREY, 1.5 if im else 0.6)
+        ax.text(ex + 0.8, cy2 + rh / 2, ct, va="center",
+            fontsize=6.5, color=acc if im else DGREY,
+            fontfamily="monospace", fontweight="bold" if im else "normal")
+        ax.text(ex + ew - 0.8, cy2 + rh / 2, sc, va="center", ha="right",
+            fontsize=6.5, color=acc if im else GREY, fontfamily="monospace")
+    ax.text(ex + ew / 2, cy2 - 3.5, "…", ha="center", fontsize=9, color=GREY)
+
+    # normalization
+    ny = cy2 - 8.5
+    rbox(ax, ex, ny, ew, 4.2, "#F3F4F6", med, lw=0.8, r=3)
+    ax.text(ex + ew / 2, ny + 2.1, "normalisasi",
+        ha="center", va="center", fontsize=6.5, color=med)
+    nry = ny - 5.5
+    rbox(ax, ex, nry, ew, 4.5, alt, acc, lw=1.2)
+    ax.text(ex + ew / 2, nry + 2.2, title_norm[:22],
+        ha="center", va="center", fontsize=7.5, color=acc,
+        fontfamily="monospace", fontweight="bold")
+
+    # comparison header
+    cy3 = nry - 6
+    rbox(ax, ex, cy3, ew, 4.5, med, med, lw=0, r=3)
+    ax.text(ex + ew / 2, cy3 + 2.2, "perbandingan (edit distance)",
+        ha="center", va="center", fontsize=6.3, color=WHITE)
+
+    fin = [
+        (title_norm[:20], "0.00", True),
+        ((title_norm[:17] + "…" if len(title_norm) > 17 else title_norm), "0.11", False),
+        (title_norm.split()[0] if " " in title_norm else title_norm, "0.45", False),
+        (author_str.lower()[:18], "0.72", False),
+    ]
+    fs = cy3 - 0.5
+    for i, (ct, sc, im) in enumerate(fin):
+        fy = fs - (i + 1) * rh
+        rbox(ax, ex, fy, ew, rh - 0.4,
+            alt if im else WHITE, acc if im else LGREY, 1.8 if im else 0.6)
+        ax.text(ex + 0.8, fy + rh / 2, ct, va="center",
+            fontsize=6.5, color=acc if im else DGREY,
+            fontfamily="monospace", fontweight="bold" if im else "normal")
+        ax.text(ex + ew - 0.8, fy + rh / 2, sc, va="center", ha="right",
+            fontsize=6.5, color=acc if im else GREY, fontfamily="monospace")
+    ax.text(ex + ew / 2, fy - 3.2, "…", ha="center", fontsize=9, color=GREY)
+
+    # ── COL 5: Results ────────────────────────────────────────────────────────
+    rx = 76; rw = 23.5
+
+    rbox(ax, rx, TOP - 10, rw, 6.5, alt, acc, lw=1.5)
+    ax.text(rx + rw / 2, TOP - 6.5, "hasil analisis tipografi",
+        ha="center", va="center", fontsize=7.5, color=acc, fontweight="bold")
+
+    tipe_font = str(row.get("tipe_font", "—") or "—")
+    tf_cat    = str(row.get("typeface_kategori", "unknown") or "unknown")
+    clip1     = str(row.get("clip_font_1", "—") or "—")
+    cs1       = float(row.get("clip_score_1", 0) or 0)
+    margin    = float(row.get("clip_margin", 0) or 0)
+    src       = str(row.get("font_source", "—") or "—")
+
+    conf_txt_col = "#1B5E20" if not low_conf else "#B71C1C"
+    conf_txt_lbl = "HIGH" if not low_conf else "LOW"
+
+    # Main card
+    card_y = TOP - 12
+    card_h = (TOP - 13 - BOT - 3)
+    rbox(ax, rx, BOT + 1, rw, card_h, alt, acc, lw=1.5)
+
+    y_cur = BOT + card_h - 1.5
+    def rf(label, value, val_color=DARK):
+        nonlocal y_cur
+        ax.text(rx + 0.9, y_cur, label,    fontsize=5.8, color=GREY,     va="top")
+        ax.text(rx + 9.5, y_cur, value,    fontsize=7.0, color=val_color, va="top", fontweight="bold")
+        y_cur -= 6.5
+
+    ax.text(rx + 0.9, y_cur, f'teks: "{ocr_raw[:22]}"',
+        fontsize=6.2, color=DGREY, fontfamily="monospace", fontweight="bold", va="top")
+    y_cur -= 4.5
+    ax.plot([rx + 0.9, rx + rw - 0.9], [y_cur, y_cur], color=LGREY, lw=0.6)
+    y_cur -= 2.5
+
+    rf("font:", tipe_font[:20], acc)
+    rf("CLIP top-1:", f"{clip1[:18]} ({cs1:.3f})", DGREY)
+    rf("kategori:", TYPEFACE_ID.get(tf_cat, tf_cat), acc)
+    rf("sumber:", src, DGREY)
+    rf("match_type:", mt, DGREY)
+    rf("margin:", f"{margin:.4f}", "#E65100" if margin < 0.01 else DARK)
+
+    ax.plot([rx + 0.9, rx + rw - 0.9], [y_cur + 2, y_cur + 2], color=LGREY, lw=0.6)
+    y_cur -= 1
+    ax.text(rx + 0.9, y_cur, "confidence:", fontsize=5.8, color=GREY, va="top")
+    ax.text(rx + 9.5, y_cur, conf_txt_lbl, fontsize=10,
+        color=conf_txt_col, fontweight="bold", va="top")
+
+    fig.text(0.5, 0.01,
+        "Kartografi Sampul Sastra Indonesia  |  Esai DKJ  |  Modul B v5  |  "
+        "EasyOCR + Edit Distance + CLIP ViT-B/32 + Font DB",
+        ha="center", fontsize=6.5, color=GREY, fontfamily="monospace")
+
+    # ── Render to Streamlit ───────────────────────────────────────────────────
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", dpi=160, bbox_inches="tight",
+        facecolor=BG, edgecolor="none", pad_inches=0.12)
+    plt.close(fig)
+    buf.seek(0)
+    st.image(buf, use_container_width=True)
+
+    # ── Download button ───────────────────────────────────────────────────────
+    safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in sel_title)
+    st.download_button(
+        label="Unduh diagram (PNG)",
+        data=buf.getvalue(),
+        file_name=f"pipeline_{safe_title[:40]}.png",
+        mime="image/png",
+        key="pd_download",
+    )
+
+    # ── Raw data expander ─────────────────────────────────────────────────────
+    with st.expander("Data mentah buku ini (dari CSV)", expanded=False):
+        show_cols = [
+            "title", "AUTHOR", "YEAR", "ocr_text", "ocr_confidence", "ocr_zone",
+            "clip_font_1", "clip_score_1", "clip_cat_1",
+            "clip_font_2", "clip_score_2",
+            "clip_font_3", "clip_score_3",
+            "clip_margin", "tipe_font", "font_source",
+            "match_type", "typeface_kategori", "typeface_low_conf",
+        ]
+        available = [c for c in show_cols if c in row.index]
+        st.dataframe(row[available].to_frame(name="nilai").T, use_container_width=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INTEGRASI KE render_tipografi()
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Ganti bagian tab di render_tipografi() dari:
+#
+#   tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+#       "📊 Gambaran Umum",
+#       "🗺 Peta Panas Genre",
+#       "🔍 Per Genre",
+#       "🔤 Font Spesifik",
+#       "🎭 Klaster Genre",
+#       "🔎 Cari Buku",
+#   ])
+#
+# Menjadi:
+#
+#   tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+#       "📊 Gambaran Umum",
+#       "🗺 Peta Panas Genre",
+#       "🔍 Per Genre",
+#       "🔤 Font Spesifik",
+#       "🎭 Klaster Genre",
+#       "🔎 Cari Buku",
+#       "🔬 Pipeline Diagram",
+#   ])
+#
+# Dan tambahkan di bawah "with tab6":
+#
+#   with tab7:
+#       _tab_pipeline_diagram(DF)
+#
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 def render_tipografi(DF):
@@ -1389,7 +1793,7 @@ def render_tipografi(DF):
     st.markdown("<hr class='thin'>", unsafe_allow_html=True)
 
     # ── Tab navigasi ──────────────────────────────────────────────────────────
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "📊 Gambaran Umum",
         "🗺 Peta Panas Genre",
         "🔍 Per Genre",
@@ -1415,3 +1819,6 @@ def render_tipografi(DF):
 
     with tab6:
         _tab_cari(DF)
+
+    with tab7:
+        _tab_pipeline_diagram(DF)
