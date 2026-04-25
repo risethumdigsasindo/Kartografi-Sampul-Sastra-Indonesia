@@ -1794,31 +1794,32 @@ def render_tipografi(DF):
 
     # ── Tab navigasi ──────────────────────────────────────────────────────────
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-        "📊 Gambaran Umum",
-        "🗺 Peta Panas Genre",
-        "🔍 Per Genre",
-        "🔤 Font Spesifik",
-        "🎭 Klaster Genre",
-        "🔎 Cari Buku",
-    ])
+    "📊 Gambaran Umum",
+    "🗺 Peta Panas Genre",
+    "🔍 Per Genre",
+    "🔤 Font Spesifik",
+    "🎭 Klaster Genre",
+    "🔎 Cari Buku",
+    "🔬 Pipeline Diagram",   # ← tambahkan ini
+])
 
-    with tab1:
-        _tab_gambaran(DF)
+with tab1:
+    _tab_gambaran(DF)
 
-    with tab2:
-        _tab_heatmap_genre(DF)
+with tab2:
+    _tab_heatmap_genre(DF)
 
-    with tab3:
-        _tab_per_genre(DF)
+with tab3:
+    _tab_per_genre(DF)
 
-    with tab4:
-        _tab_font_spesifik(DF)
+with tab4:
+    _tab_font_spesifik(DF)
 
-    with tab5:
-        _tab_klaster_genre(DF)
+with tab5:
+    _tab_klaster_genre(DF)
 
-    with tab6:
-        _tab_cari(DF)
+with tab6:
+    _tab_cari(DF)
 
-    with tab7:
-        _tab_pipeline_diagram(DF)
+with tab7:                    # ← tambahkan ini
+    _tab_pipeline_diagram(DF)
