@@ -259,6 +259,184 @@ def build_crosstab(df, genre_list):
     return mat, counts
 
 
+def get_font_column(df):
+    """Ambil kolom nama font yang tersedia di CSV."""
+    candidates = [
+        "tipe_font", "font", "font_name", "font_pred",
+        "predicted_font", "matched_font", "font_family",
+    ]
+    for c in candidates:
+        if c in df.columns:
+            return c
+    return None
+
+
+def dominant_fonts_by_genre(df_clean, target_genres=None, top_n=8):
+    """Hitung font dominan untuk genre target."""
+    if target_genres is None:
+        target_genres = ["Fiksi Sejarah", "Thriller/Misteri", "Horor"]
+
+    font_col = get_font_column(df_clean)
+    if font_col is None:
+        return pd.DataFrame(), None
+
+    gl_all = df_clean["_genre_lists"].tolist()
+    rows = []
+
+    for genre in target_genres:
+        mask = [genre in gl for gl in gl_all]
+        sub = df_clean[mask].copy()
+        if sub.empty:
+            continue
+
+        sub = sub[sub[font_col].notna()].copy()
+        sub[font_col] = sub[font_col].astype(str).str.strip()
+        sub = sub[(sub[font_col] != "") & (sub[font_col].str.lower() != "unknown")]
+        if sub.empty:
+            continue
+
+        total = len(sub)
+        vc = sub.groupby([font_col, "typeface_paper"]).size().reset_index(name="Jumlah")
+        vc = vc.sort_values("Jumlah", ascending=False).head(top_n)
+
+        for _, r in vc.iterrows():
+            rows.append({
+                "Genre": genre,
+                "Typeface": r["typeface_paper"],
+                "Font": r[font_col],
+                "Jumlah": int(r["Jumlah"]),
+                "Persentase": r["Jumlah"] / total,
+            })
+
+    return pd.DataFrame(rows), font_col
+
+
+def tab_font_dominan_tiga_genre(df_clean):
+    """
+    Analisis khusus font dominan pada tiga genre Klaster 3:
+    Fiksi Sejarah, Thriller/Misteri, dan Horor.
+    """
+    target_genres = ["Fiksi Sejarah", "Thriller/Misteri", "Horor"]
+
+    section_header(
+        "Font Dominan pada Genre Serif Klaster 3",
+        subtitle="Perbandingan font spesifik pada Fiksi Sejarah, Thriller/Misteri, dan Horor",
+        color="#1D9E75",
+        bg="#EEF8F4",
+    )
+
+    font_df, font_col = dominant_fonts_by_genre(
+        df_clean, target_genres=target_genres, top_n=8
+    )
+
+    if font_col is None:
+        st.info("Kolom nama font tidak ditemukan. Tambahkan kolom `tipe_font` atau `font_name` pada CSV.")
+        return
+
+    if font_df.empty:
+        st.info("Data font untuk tiga genre target belum cukup.")
+        return
+
+    st.caption(
+        f"Analisis memakai kolom `{font_col}` dan hanya menampilkan font yang berhasil teridentifikasi."
+    )
+
+    gl_all = df_clean["_genre_lists"].tolist()
+    genre_notes = {
+        "Fiksi Sejarah": "Serif klasik/transitional membangun kesan historis, formal, dan literer.",
+        "Thriller/Misteri": "Serif berkontras tinggi atau display-serif memberi nuansa tegang dan dramatis.",
+        "Horor": "Serif ekspresif/dekoratif menciptakan atmosfer gelap, ganjil, atau tidak nyaman.",
+    }
+
+    cols = st.columns(3)
+    for col, genre in zip(cols, target_genres):
+        mask = [genre in gl for gl in gl_all]
+        sub = df_clean[mask]
+        n = len(sub)
+
+        tf = sub["typeface_paper"].value_counts(normalize=True) if not sub.empty else pd.Series(dtype=float)
+        top_tf = tf.index[0] if not tf.empty else "—"
+        top_tf_pct = tf.iloc[0] if not tf.empty else 0
+
+        top_fonts = font_df[font_df["Genre"] == genre].head(3)
+        font_list = ", ".join(top_fonts["Font"].tolist()) if not top_fonts.empty else "—"
+        clr = TYPEFACE_CLR.get(top_tf, "#333333")
+
+        with col:
+            st.markdown(
+                f"""
+                <div style="background:#FFFFFF;border:1px solid #DDE7E2;border-top:4px solid #1D9E75;
+                            border-radius:0 0 10px 10px;padding:12px 14px;min-height:190px;">
+                    <div style="font-size:.72rem;color:#667;text-transform:uppercase;letter-spacing:.04em;">
+                        {GENRE_TO_KLASTER[genre]["id"]}
+                    </div>
+                    <div style="font-family:Georgia,serif;font-size:1.08rem;font-weight:700;color:#1D3B31;
+                                margin:.15rem 0 .35rem;">
+                        {genre}
+                    </div>
+                    <div style="font-size:.72rem;color:#555;margin-bottom:.4rem;">
+                        n = <b>{n:,}</b> sampul · dominan:
+                        <b style="color:{clr};">{top_tf}</b> ({top_tf_pct*100:.1f}%)
+                    </div>
+                    <div style="font-size:.72rem;line-height:1.45;color:#333;">
+                        <b>Font teratas:</b><br>{font_list}
+                    </div>
+                    <div style="font-size:.66rem;line-height:1.4;color:#777;margin-top:.55rem;">
+                        {genre_notes.get(genre, "")}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    fig = px.bar(
+        font_df,
+        x="Persentase",
+        y="Font",
+        color="Typeface",
+        facet_col="Genre",
+        facet_col_spacing=0.08,
+        orientation="h",
+        text=font_df["Persentase"].map(lambda x: f"{x*100:.1f}%"),
+        color_discrete_map=TYPEFACE_CLR,
+        category_orders={"Genre": target_genres},
+    )
+    fig.update_traces(textposition="outside", marker_line_width=0)
+    fig.update_layout(
+        **pb(430, margin=dict(l=120, r=30, t=48, b=70)),
+        xaxis_title="Proporsi dalam genre",
+        yaxis_title="",
+        legend=dict(orientation="h", y=-.16, font=dict(size=10)),
+    )
+    fig.update_xaxes(tickformat=".0%")
+    fig.for_each_annotation(lambda a: a.update(text=a.text.replace("Genre=", "")))
+    st.plotly_chart(fig, use_container_width=True)
+
+    table_df = font_df.copy()
+    table_df["Persentase"] = (table_df["Persentase"] * 100).round(1).astype(str) + "%"
+    table_df = table_df[["Genre", "Typeface", "Font", "Jumlah", "Persentase"]]
+
+    with st.expander("Lihat tabel font dominan"):
+        st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+    st.markdown(
+        """
+        <div style="background:#FAFAFA;border-left:4px solid #1D9E75;border-radius:0 8px 8px 0;
+                    padding:10px 14px;margin-top:.8rem;font-size:.82rem;line-height:1.55;">
+        <b>Catatan interpretif:</b> ketiga genre ini sama-sama berada dalam Klaster 3 dan
+        cenderung kuat pada Serif, tetapi font spesifiknya tidak selalu sama. Perbedaan font
+        pada level mikro menunjukkan bahwa kategori Serif bekerja sebagai payung visual,
+        sementara pilihan font tertentu membentuk persona genre: historis pada
+        <i>Fiksi Sejarah</i>, tegang pada <i>Thriller/Misteri</i>, dan atmosferik-gelap pada
+        <i>Horor</i>.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 
 def safe_pct(num, den, digits=1):
     """Return safe percentage for display."""
@@ -1022,15 +1200,16 @@ def render_tipografi_4cat(DF):
 
     st.caption(
         f"Data aktif: **{n_clean:,} buku** terklasifikasi dari {n_total:,} total "
-        f"({n_clean/n_total*100:.1f}%). Sumber: kolom `typeface_paper`."
+        f"({safe_pct(n_clean, n_total):.1f}%). Sumber: kolom `typeface_paper`."
     )
 
     # ── Tab navigasi ──────────────────────────────────────────────────────────
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "📊 Gambaran Umum",
         "🗺 Peta Panas Genre",
         "🎭 Per Klaster",
         "🔍 Per Genre",
+        "🔠 Font Dominan K3",
         "🖼 Typeface × Ilustrasi",
         "⚠️ Catatan Metodologis",
     ])
@@ -1048,7 +1227,10 @@ def render_tipografi_4cat(DF):
         tab_per_genre(df_clean)
 
     with tab5:
-        tab_typeface_ilustrasi(df_clean)
+        tab_font_dominan_tiga_genre(df_clean)
 
     with tab6:
+        tab_typeface_ilustrasi(df_clean)
+
+    with tab7:
         tab_metodologi(DF, df_clean)
