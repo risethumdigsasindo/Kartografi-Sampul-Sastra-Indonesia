@@ -1,16 +1,17 @@
 """
-ilustrasi_block.py  ·  v3
+ilustrasi_block.py  ·  v4
 Halaman analisis gaya ilustrasi — Kartografi Sampul Sastra Indonesia.
 Dipanggil dari app.py:
     from ilustrasi_block import render_ilustrasi
     render_ilustrasi(DF, cover_dir=COVER_DIR)
 
-Perubahan v3:
-  - Padanan: flat_graphic → "Ilustrasi Digital", hand_drawn → "Ilustrasi Manual"
-  - Heatmap: Romansa Kontemporer → Romansa (normalisasi case-insensitive diperkuat)
-  - Heatmap: urutan genre dikelompokkan K1 → K2 → K3, garis separator antar klaster
-  - Analisis objek: nama objek + heatmap objek × genre + cari sampul per objek
-  - Filter pencarian buku: tambah filter genre
+Perubahan v4:
+  - flat_graphic → "Ilustrasi Digital", hand_drawn → "Ilustrasi Manual"
+  - Terjemahan label objek YOLO (COCO-80) ke Bahasa Indonesia
+  - Normalisasi genre case-insensitive: semua varian Romansa → "Romansa"
+  - Heatmap diurutkan K1 → K2 → K3, garis separator antar klaster
+  - Heatmap objek × genre dengan nama objek terjemahan
+  - Filter pencarian buku: gaya + genre + figur manusia
 """
 
 import base64
@@ -23,12 +24,69 @@ import plotly.graph_objects as go
 import streamlit as st
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# KONSTANTA
+# TERJEMAHAN LABEL OBJEK YOLO (COCO-80) → BAHASA INDONESIA
+# ═══════════════════════════════════════════════════════════════════════════════
+YOLO_ID = {
+    # Manusia
+    "person": "orang",
+    # Kendaraan
+    "bicycle": "sepeda", "car": "mobil", "motorcycle": "motor",
+    "airplane": "pesawat", "bus": "bus", "train": "kereta",
+    "truck": "truk", "boat": "perahu",
+    # Jalan & rambu
+    "traffic light": "lampu lalu lintas", "fire hydrant": "hidran",
+    "stop sign": "rambu stop", "parking meter": "meteran parkir",
+    "bench": "bangku",
+    # Hewan
+    "bird": "burung", "cat": "kucing", "dog": "anjing",
+    "horse": "kuda", "sheep": "domba", "cow": "sapi",
+    "elephant": "gajah", "bear": "beruang", "zebra": "zebra",
+    "giraffe": "jerapah",
+    # Aksesori
+    "backpack": "ransel", "umbrella": "payung", "handbag": "tas tangan",
+    "tie": "dasi", "suitcase": "koper",
+    # Olahraga
+    "frisbee": "frisbee", "skis": "ski", "snowboard": "papan salju",
+    "sports ball": "bola olahraga", "kite": "layang-layang",
+    "baseball bat": "tongkat baseball", "baseball glove": "sarung tangan baseball",
+    "skateboard": "skateboard", "surfboard": "papan selancar",
+    "tennis racket": "raket tenis",
+    # Dapur & makan
+    "bottle": "botol", "wine glass": "gelas anggur", "cup": "cangkir",
+    "fork": "garpu", "knife": "pisau", "spoon": "sendok",
+    "bowl": "mangkuk",
+    # Makanan
+    "banana": "pisang", "apple": "apel", "sandwich": "sandwich",
+    "orange": "jeruk", "broccoli": "brokoli", "carrot": "wortel",
+    "hot dog": "hot dog", "pizza": "pizza", "donut": "donat",
+    "cake": "kue",
+    # Furnitur & ruangan
+    "chair": "kursi", "couch": "sofa", "potted plant": "tanaman pot",
+    "bed": "tempat tidur", "dining table": "meja makan",
+    "toilet": "toilet", "tv": "televisi", "laptop": "laptop",
+    "mouse": "tetikus", "remote": "remote", "keyboard": "keyboard",
+    "cell phone": "ponsel",
+    # Elektronik & rumah tangga
+    "microwave": "microwave", "oven": "oven", "toaster": "pemanggang roti",
+    "sink": "wastafel", "refrigerator": "kulkas",
+    # Buku & kerja
+    "book": "buku", "clock": "jam", "vase": "vas",
+    "scissors": "gunting", "teddy bear": "boneka beruang",
+    "hair drier": "pengering rambut", "toothbrush": "sikat gigi",
+}
+
+def _terjemahkan_objek(label: str) -> str:
+    """Terjemahkan label YOLO ke Bahasa Indonesia; kembalikan aslinya jika tidak ada."""
+    return YOLO_ID.get(label.strip().lower(), label.strip())
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# KONSTANTA GAYA ILUSTRASI
 # ═══════════════════════════════════════════════════════════════════════════════
 GAYA_ID = {
     "photograph":    "Fotografi",
-    "flat_graphic":  "Ilustrasi Digital",   # v3
-    "hand_drawn":    "Ilustrasi Manual",    # v3
+    "flat_graphic":  "Ilustrasi Digital",
+    "hand_drawn":    "Ilustrasi Manual",
     "text_dominant": "Dominan Teks",
     "abstract":      "Abstrak",
     "collage":       "Kolase",
@@ -51,11 +109,11 @@ GAYA_ICON = {
 }
 GAYA_DESKRIPSI = {
     "photograph":    "Gambar dihasilkan dari rekaman kamera; menyerupai realitas.",
-    "flat_graphic":  "Ilustrasi digital vektor bersih tanpa tekstur tangan; garis sempurna dan warna solid. Dihasilkan lewat perangkat lunak seperti Illustrator atau Canva.",
-    "hand_drawn":    "Ada jejak tangan yang tampak di permukaan: goresan, tekstur kuas/pensil, ketidaksempurnaan garis organik.",
-    "text_dominant": "Sampul didominasi elemen tipografi, minim elemen gambar.",
-    "abstract":      "Bentuk-bentuk non-figuratif; tidak merepresentasikan objek nyata secara langsung.",
-    "collage":       "Gabungan beberapa elemen visual dari sumber berbeda.",
+    "flat_graphic":  "Ilustrasi digital vektor bersih tanpa jejak tangan; garis sempurna dan warna solid. Dihasilkan melalui perangkat lunak seperti Illustrator atau Canva.",
+    "hand_drawn":    "Ada jejak tangan yang tampak di permukaan: goresan, tekstur kuas atau pensil, ketidaksempurnaan garis yang organik.",
+    "text_dominant": "Sampul didominasi elemen tipografi; minim elemen gambar.",
+    "abstract":      "Bentuk-bentuk non-figuratif yang tidak merepresentasikan objek nyata secara langsung.",
+    "collage":       "Gabungan beberapa elemen visual dari sumber yang berbeda.",
 }
 GAYA_PROD_MODE = {
     "photograph":    "recording technologies",
@@ -67,46 +125,52 @@ GAYA_PROD_MODE = {
 }
 GAYA_PROB_KEYS = ["photograph", "hand_drawn", "abstract", "flat_graphic", "text_dominant"]
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# KONSTANTA GENRE
+# ═══════════════════════════════════════════════════════════════════════════════
 GENRE_EXCLUDE = {
-    "Sastra Indonesia","Sastra","Fiksi","Nonfiction","Non-fiction",
-    "Nonfiksi","Non Fiksi","Non-fiksi",
+    "Sastra Indonesia", "Sastra", "Fiksi", "Nonfiction", "Non-fiction",
+    "Nonfiksi", "Non Fiksi", "Non-fiksi",
 }
 
-# Normalisasi: semua varian romansa → "Romansa", case-insensitive via lower-key lookup
+# Semua varian → bentuk baku; lookup dibuat lowercase agar case-insensitive
 _GENRE_NORM_RAW = {
-    "Cinta":"Romansa","Roman":"Romansa",
-    "Romansa Kontemporer":"Romansa",
-    "Kontemporer":"Romansa",
-    "Romansatic":"Romansa",
-    "Young Adult Romansace":"Romansa",
-    "Thriller":"Thriller/Misteri","Misteri":"Thriller/Misteri",
-    "Misteri Thriller":"Thriller/Misteri","Thriller Suspense":"Thriller/Misteri",
-    "Psychological Thriller":"Thriller/Misteri","Suspense":"Thriller/Misteri",
-    "Detective":"Thriller/Misteri","Kriminal":"Thriller/Misteri",
-    "Supranatural":"Horor","Humor":"Komedi",
-    "New Adult":"Remaja","Collections":"Antologi","Middle Grade":"Fantasi",
-    "Fiksi Ilmiah":"Fiksi Sains","Distopia":"Fiksi Sains",
-    "Sejarah":"Fiksi Sejarah","Historical Fiction":"Fiksi Sejarah",
-    "Historical":"Fiksi Sejarah",
+    # Romansa — semua varian
+    "Cinta": "Romansa", "Roman": "Romansa",
+    "Romansa Kontemporer": "Romansa",
+    "Romansa kontemporer": "Romansa",
+    "Kontemporer": "Romansa",
+    "Romansatic": "Romansa",
+    "Young Adult Romansace": "Romansa",
+    # Thriller
+    "Thriller": "Thriller/Misteri", "Misteri": "Thriller/Misteri",
+    "Misteri Thriller": "Thriller/Misteri", "Thriller Suspense": "Thriller/Misteri",
+    "Psychological Thriller": "Thriller/Misteri", "Suspense": "Thriller/Misteri",
+    "Detective": "Thriller/Misteri", "Kriminal": "Thriller/Misteri",
+    # Lainnya
+    "Supranatural": "Horor", "Humor": "Komedi",
+    "New Adult": "Remaja", "Collections": "Antologi", "Middle Grade": "Fantasi",
+    "Fiksi Ilmiah": "Fiksi Sains", "Distopia": "Fiksi Sains",
+    "Sejarah": "Fiksi Sejarah", "Historical Fiction": "Fiksi Sejarah",
+    "Historical": "Fiksi Sejarah",
 }
-# Build lowercase lookup untuk case-insensitive matching
 _GENRE_NORM_LOWER = {k.lower(): v for k, v in _GENRE_NORM_RAW.items()}
 
-# Klaster dengan Komedi → K3, urutan K1 → K2 → K3
+# Klaster — Komedi di K3, urutan K1 → K2 → K3
 KLASTER_ORDERED = [
     {
-        "id":"K1","color":"#2E4057","bg":"#EEF2F7",
-        "genres":["Novel","Cerita Pendek","Antologi","Puisi"],
+        "id": "K1", "color": "#2E4057", "bg": "#EEF2F7",
+        "genres": ["Novel", "Cerita Pendek", "Antologi", "Puisi"],
     },
     {
-        "id":"K2","color":"#993556","bg":"#FBF0F3",
-        "genres":["Romansa","Chick Lit","Persahabatan","Remaja","Dewasa",
-                  "Keluarga","Drama","Slice of Life"],
+        "id": "K2", "color": "#993556", "bg": "#FBF0F3",
+        "genres": ["Romansa", "Chick Lit", "Persahabatan", "Remaja", "Dewasa",
+                   "Keluarga", "Drama", "Slice of Life"],
     },
     {
-        "id":"K3","color":"#1D9E75","bg":"#EEF8F4",
-        "genres":["Fantasi","Fiksi Sejarah","Petualangan","Anak-anak",
-                  "Fiksi Sains","Thriller/Misteri","Horor","Komedi"],
+        "id": "K3", "color": "#1D9E75", "bg": "#EEF8F4",
+        "genres": ["Fantasi", "Fiksi Sejarah", "Petualangan", "Anak-anak",
+                   "Fiksi Sains", "Thriller/Misteri", "Horor", "Komedi"],
     },
 ]
 GENRE_KLASTER_MAP: dict = {}
@@ -156,10 +220,11 @@ def _genre_counts(d: pd.DataFrame) -> Counter:
 
 
 def _top_genres_ordered(d: pd.DataFrame, n: int = 16) -> list:
+    """Genre diurutkan sesuai klaster (K1 → K2 → K3), sisanya di belakang."""
     gc = _genre_counts(d)
     eligible = {g for g, c in gc.items() if g not in GENRE_EXCLUDE and c >= 3}
     ordered = [g for g in _KLASTER_GENRE_ORDER if g in eligible]
-    rest    = [g for g, _ in gc.most_common() if g in eligible and g not in ordered]
+    rest = [g for g, _ in gc.most_common() if g in eligible and g not in ordered]
     return (ordered + rest)[:n]
 
 
@@ -195,7 +260,7 @@ def cover_path(img, cover_dir):
 def palette_html(row, n=5):
     parts, total = [], 0.0
     for i in range(1, n + 1):
-        hx  = str(row.get(f"warna_hex_{i}", "") or "").strip()
+        hx = str(row.get(f"warna_hex_{i}", "") or "").strip()
         pct = row.get(f"warna_pct_{i}", 0)
         try:
             pct = float(pct)
@@ -224,8 +289,8 @@ def prob_bars_html(probs_dict):
     html = ""
     for key, val in sorted(probs_dict.items(), key=lambda x: -x[1]):
         label = GAYA_ID.get(key, key)
-        clr   = GAYA_CLR.get(key, "#999")
-        pct   = val * 100
+        clr = GAYA_CLR.get(key, "#999")
+        pct = val * 100
         html += (
             f'<div style="margin:.1rem 0;">'
             f'<div style="font-size:.6rem;display:flex;justify-content:space-between;'
@@ -253,7 +318,7 @@ def book_card_gi(row, col_obj, cover_dir, show_probs=False):
                 unsafe_allow_html=True,
             )
 
-        gk  = str(row.get("gaya_ilustrasi", "") or "")
+        gk = str(row.get("gaya_ilustrasi", "") or "")
         clr = GAYA_CLR.get(gk, "#999")
         try:
             sc = f"{float(row.get('gaya_skor', 0)):.2f}"
@@ -265,7 +330,7 @@ def book_card_gi(row, col_obj, cover_dir, show_probs=False):
             if row.get("YEAR", 0) and int(row.get("YEAR", 0)) > 0
             else "–"
         )
-        url   = row.get("URL", "")
+        url = row.get("URL", "")
         title = str(row.get("TITLE", "–"))
         title_html = (
             f'<a href="{url}" target="_blank" style="text-decoration:none;color:inherit;">{title}</a>'
@@ -275,7 +340,7 @@ def book_card_gi(row, col_obj, cover_dir, show_probs=False):
             f'<span style="display:inline-block;font-size:.64rem;font-weight:500;'
             f'padding:1px 7px;border-radius:20px;border:1px solid {clr};'
             f'color:{clr};margin:2px 2px 0 0;">'
-            f'{GAYA_ICON.get(gk,"")} {GAYA_ID.get(gk,gk)} {sc}</span>'
+            f'{GAYA_ICON.get(gk, "")} {GAYA_ID.get(gk, gk)} {sc}</span>'
         ) if gk else ""
 
         gi_bars = ""
@@ -289,7 +354,7 @@ def book_card_gi(row, col_obj, cover_dir, show_probs=False):
             f'<div style="font-family:\'Lora\',serif;font-size:.82rem;font-weight:600;'
             f'line-height:1.3;">{title_html}</div>'
             f'<div style="font-size:.71rem;opacity:.6;margin:.15rem 0 .3rem;">'
-            f'{row.get("AUTHOR","–")} · {year}</div>'
+            f'{row.get("AUTHOR", "–")} · {year}</div>'
             f'{palette_html(row)}{badge}{gi_bars}</div>',
             unsafe_allow_html=True,
         )
@@ -302,18 +367,20 @@ def grid_gi(subset, n_cols=4, cover_dir="", show_probs=False):
         return
     for start in range(0, len(subset), n_cols):
         chunk = subset.iloc[start:start + n_cols]
-        cols  = st.columns(n_cols)
+        cols = st.columns(n_cols)
         for j, (_, row) in enumerate(chunk.iterrows()):
             book_card_gi(row, cols[j], cover_dir, show_probs=show_probs)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PARSING OBJEK YOLO
+# PARSING OBJEK YOLO — dengan terjemahan otomatis ke Bahasa Indonesia
 # ═══════════════════════════════════════════════════════════════════════════════
-def _parse_yolo_objects(series) -> Counter:
+def _parse_yolo_objects(series, terjemahkan=True) -> Counter:
     """
-    Mendukung format:
+    Parsing kolom objek YOLO. Format yang didukung:
       "person,car,book"  |  "['person','car']"  |  "{person:2,car:1}"  |  "person:2;car:1"
+
+    Jika terjemahkan=True, label diterjemahkan ke Bahasa Indonesia via YOLO_ID.
     """
     ctr: Counter = Counter()
     for val in series:
@@ -326,28 +393,32 @@ def _parse_yolo_objects(series) -> Counter:
                 continue
             if ":" in item:
                 parts = item.split(":", 1)
-                label = parts[0].strip().strip("\"'")
+                raw_label = parts[0].strip().strip("\"'")
                 try:
                     count = int(float(parts[1].strip()))
                 except Exception:
                     count = 1
             else:
-                label = item
+                raw_label = item
                 count = 1
-            if label and len(label) > 1:
-                ctr[label] += count
+            if not raw_label or len(raw_label) <= 1:
+                continue
+            label = _terjemahkan_objek(raw_label) if terjemahkan else raw_label
+            ctr[label] += count
     return ctr
 
 
 def _detect_yolo_col(df: pd.DataFrame):
+    """Deteksi otomatis nama kolom objek YOLO."""
     candidates = [
-        "yolo_objek_list","yolo_label_list","yolo_labels",
-        "yolo_objects","objek_list","detected_objects",
+        "yolo_objek", "yolo_objek_list", "yolo_label_list",
+        "yolo_labels", "yolo_objects", "objek_list", "detected_objects",
     ]
     found = next((c for c in candidates if c in df.columns), None)
     if found:
         return found
-    auto = [c for c in df.columns if "objek" in c.lower() or "label" in c.lower()]
+    # Fallback: kolom yang mengandung kata 'objek' atau 'label'
+    auto = [c for c in df.columns if "objek" in c.lower() or "yolo" in c.lower()]
     return auto[0] if auto else None
 
 
@@ -355,7 +426,7 @@ def _detect_yolo_col(df: pd.DataFrame):
 # HEATMAPS
 # ═══════════════════════════════════════════════════════════════════════════════
 def _klaster_shapes(genres: list) -> list:
-    """Garis pemisah antar klaster untuk heatmap."""
+    """Garis putus-putus pemisah antar klaster pada heatmap."""
     shapes, prev_kl = [], None
     for i, g in enumerate(genres):
         kl = GENRE_KLASTER_MAP.get(g, {}).get("id")
@@ -377,12 +448,12 @@ def _make_y_labels(genres: list) -> list:
 
 
 def heatmap_gaya_genre(d: pd.DataFrame, top_n=12):
-    genres    = _top_genres_ordered(d, top_n)
+    genres = _top_genres_ordered(d, top_n)
     gaya_keys = list(GAYA_ID.keys())
     gaya_lbls = [GAYA_ID[k] for k in gaya_keys]
 
-    mat    = pd.DataFrame(0.0, index=genres, columns=gaya_lbls)
-    d2     = d[d["gaya_ilustrasi"].notna()].copy()
+    mat = pd.DataFrame(0.0, index=genres, columns=gaya_lbls)
+    d2 = d[d["gaya_ilustrasi"].notna()].copy()
     gl_all = expand_genres(d2["GENRES"], normalize=True)
 
     for g in genres:
@@ -416,38 +487,48 @@ def heatmap_gaya_genre(d: pd.DataFrame, top_n=12):
 def heatmap_objek_genre(d: pd.DataFrame, yolo_col: str,
                          top_n_obj=20, top_n_genre=14):
     """
-    Heatmap nama objek × genre.
-    Nilai: % sampul dalam genre yang mengandung objek tersebut.
+    Heatmap nama objek (terjemahan Indonesia) × genre.
+    Nilai sel = % sampul dalam genre tersebut yang mengandung objek itu.
     """
-    genres    = _top_genres_ordered(d, top_n_genre)
-    gl_all    = expand_genres(d["GENRES"], normalize=True)
-    ctr_global = _parse_yolo_objects(d[yolo_col])
+    genres = _top_genres_ordered(d, top_n_genre)
+    gl_all = expand_genres(d["GENRES"], normalize=True)
+
+    # Kumpulkan frekuensi objek global (sudah diterjemahkan)
+    ctr_global = _parse_yolo_objects(d[yolo_col], terjemahkan=True)
     if not ctr_global:
         return None
     top_objs = [o for o, _ in ctr_global.most_common(top_n_obj)]
 
     mat = pd.DataFrame(0.0, index=genres, columns=top_objs)
     for g in genres:
-        sub   = d[[g in gl for gl in gl_all]]
+        sub = d[[g in gl for gl in gl_all]]
         n_sub = len(sub)
         if n_sub == 0:
             continue
+        # Terjemahkan kolom objek untuk subset ini, lalu cek keberadaan per objek
+        sub_ctr = _parse_yolo_objects(sub[yolo_col], terjemahkan=True)
         for obj in top_objs:
-            has_obj = sub[yolo_col].astype(str).str.lower().str.contains(
-                obj.lower(), na=False
+            # Hitung % sampul yang mengandung objek ini
+            has_obj = sub[yolo_col].astype(str).apply(
+                lambda val: obj in [
+                    _terjemahkan_objek(x.strip().strip("\"'[]{}").split(":")[0].strip())
+                    for x in str(val).replace(";", ",").split(",")
+                    if x.strip()
+                ]
             )
             mat.loc[g, obj] = has_obj.sum() / n_sub
 
     y_labels = _make_y_labels(genres)
     text_mat = (mat * 100).round(0).astype(int).astype(str) + "%"
 
+    zmax = float(mat.values.max()) if mat.values.max() > 0 else 1.0
+
     fig = go.Figure(data=go.Heatmap(
         z=mat.values, x=top_objs, y=y_labels,
         colorscale="YlOrRd",
         text=text_mat.values, texttemplate="%{text}",
         textfont=dict(size=8, color="#1A1A1A"),
-        showscale=True,
-        zmin=0, zmax=float(mat.values.max()) if mat.values.max() > 0 else 1,
+        showscale=True, zmin=0, zmax=zmax,
     ))
     fig.update_layout(**pb(
         max(380, top_n_genre * 30),
@@ -466,18 +547,18 @@ def heatmap_objek_genre(d: pd.DataFrame, yolo_col: str,
 # ═══════════════════════════════════════════════════════════════════════════════
 def _pipeline_svg() -> str:
     steps = [
-        ("📥",  "Input",           "Sampul buku\n(gambar)"),
-        ("🔧",  "Preprocessing",   "resize · normalize\ncolor correction"),
-        ("🎯",  "YOLOv8n",         "Deteksi objek\nCOCO-80 (conf ≥ 0.25)"),
-        ("🔍",  "DETR ResNet-50",  "Validasi figur\nmanusia (conf ≥ 0.85)"),
-        ("🧠",  "CLIP ViT-B/32",   "Ekstraksi fitur\n512-dim embedding"),
-        ("🏷️", "Style Matching",  "6 kandidat gaya\nzero-shot cosine sim"),
-        ("✅",  "Output",          "Gaya terpilih\n+ skor similarity"),
+        ("📥", "Masukan",          "Gambar\nsampul buku"),
+        ("🔧", "Pra-pemrosesan",   "ubah ukuran · normalisasi\nkoreksi warna"),
+        ("🎯", "YOLOv8n",          "Deteksi objek\nCOCO-80 (≥ 0,25)"),
+        ("🔍", "DETR ResNet-50",   "Validasi figur\nmanusia (≥ 0,85)"),
+        ("🧠", "CLIP ViT-B/32",    "Ekstraksi fitur\nembedding 512 dim"),
+        ("🏷️","Pencocokan Gaya",  "6 kandidat gaya\nzero-shot cosine sim"),
+        ("✅", "Keluaran",         "Gaya terpilih\n+ skor kemiripan"),
     ]
     clrs = ["#E3F2FD","#FFF3E0","#E8F5E9","#FCE4EC","#F3E5F5","#E0F2F1","#F5F5F5"]
-    bw, bh, gap = 128, 72, 20
+    bw, bh, gap = 128, 74, 20
     tw = len(steps) * bw + (len(steps) - 1) * gap + 40
-    th = bh + 88
+    th = bh + 90
 
     parts = []
     for i, (icon, title, desc) in enumerate(steps):
@@ -493,7 +574,7 @@ def _pipeline_svg() -> str:
         )
         for li, line in enumerate(lines):
             parts.append(
-                f'<text x="{x+bw//2}" y="{y+44+li*12}" text-anchor="middle" '
+                f'<text x="{x+bw//2}" y="{y+45+li*12}" text-anchor="middle" '
                 f'font-size="8" fill="#555">{line}</text>'
             )
         if i < len(steps) - 1:
@@ -515,7 +596,7 @@ def _pipeline_svg() -> str:
   {body}
   <text x="{tw//2}" y="{th-6}" text-anchor="middle"
         font-size="8.5" fill="#bbb" font-style="italic">
-    Pipeline Analisis Ilustrasi · YOLOv8n + DETR ResNet-50 + CLIP ViT-B/32
+    Alur Analisis Ilustrasi · YOLOv8n + DETR ResNet-50 + CLIP ViT-B/32
   </text>
 </svg>"""
 
@@ -523,7 +604,7 @@ def _pipeline_svg() -> str:
 def _pipeline_from_file(path: str) -> str:
     with open(path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
-    ext  = path.rsplit(".", 1)[-1].lower()
+    ext = path.rsplit(".", 1)[-1].lower()
     mime = "image/png" if ext == "png" else f"image/{ext}"
     return (
         f'<div style="border:1px solid rgba(128,128,128,.13);border-radius:12px;overflow:hidden;">'
@@ -541,32 +622,32 @@ def render_ilustrasi(DF: pd.DataFrame, cover_dir: str = ""):
     with st.expander("📖 Cara kerja analisis ilustrasi & model CLIP", expanded=False):
         st.markdown("""
 Jika tipografi bekerja pada level karakter dan garis huruf, analisis ilustrasi beroperasi
-pada level makna visual yang lebih luas — objek, komposisi, dan gaya produksi gambar secara
-keseluruhan. Tiga algoritma bekerja **secara paralel dan saling melengkapi**:
+pada level makna visual yang lebih luas — objek, komposisi, dan gaya produksi gambar
+secara keseluruhan. Tiga algoritma bekerja **secara paralel dan saling melengkapi**:
 
 | Algoritma | Peran | Detail |
 |---|---|---|
 | **CLIP ViT-B/32** | Klasifikasi *gaya* ilustrasi | Zero-shot · 400 juta pasang gambar-teks · cosine similarity |
-| **YOLOv8n** | Inventarisasi *objek* | COCO-80 · confidence ≥ 0.25 |
-| **DETR ResNet-50** | Validasi *figur manusia* | confidence ≥ 0.85 |
+| **YOLOv8n** | Inventarisasi *objek* | COCO-80 · confidence ≥ 0,25 |
+| **DETR ResNet-50** | Validasi *figur manusia* | confidence ≥ 0,85 |
 
-Berbeda dengan penggunaannya dalam analisis tipografi yang berfokus pada pencocokan karakter
-huruf terhadap database font, **CLIP dalam analisis ilustrasi bekerja pada skala gambar penuh**
-(*whole-image level*). Dengan mengajukan deskripsi seperti *"a book cover with hand-drawn
-illustration"*, CLIP mengklasifikasikan gaya berdasarkan kedekatan semantik antara representasi
-gambar dan teks — bukan karakter per karakter.
+Berbeda dengan penggunaannya dalam analisis tipografi yang berfokus pada pencocokan
+karakter huruf terhadap basis data font, **CLIP dalam analisis ilustrasi bekerja pada
+skala gambar penuh** (*whole-image level*). Dengan mengajukan deskripsi seperti
+*"a book cover with hand-drawn illustration"*, CLIP mengklasifikasikan gaya berdasarkan
+kedekatan semantik antara representasi gambar dan teks — bukan karakter per karakter.
 
 > **Akurasi tervalidasi manual:** ~72% (200 sampel acak).
         """)
 
-    # ── 1. Pipeline ───────────────────────────────────────────────────────────
-    st.markdown("### Pipeline Analisis")
+    # ── 1. Alur pipeline ──────────────────────────────────────────────────────
+    st.markdown("### Alur Analisis")
     if os.path.exists(PIPELINE_IMAGE_PATH):
         st.markdown(_pipeline_from_file(PIPELINE_IMAGE_PATH), unsafe_allow_html=True)
     else:
         st.markdown(_pipeline_svg(), unsafe_allow_html=True)
         st.caption(
-            "💡 Letakkan gambar pipeline di `assets/pipeline_ilustrasi.png` "
+            "💡 Letakkan gambar alur di `assets/pipeline_ilustrasi.png` "
             "untuk menampilkan diagram asli."
         )
 
@@ -574,10 +655,13 @@ gambar dan teks — bukan karakter per karakter.
 
     # ── 2. Kartu enam gaya ────────────────────────────────────────────────────
     st.markdown("### Enam Gaya Ilustrasi")
-    st.caption("Berdasarkan tiga mode produksi visual Kress & van Leeuwen (2001).")
+    st.caption(
+        "Berdasarkan tiga mode produksi visual Kress & van Leeuwen (2001): "
+        "*technologies of the hand*, *recording technologies*, dan *synthesizing technologies*."
+    )
     gcols = st.columns(6)
     for gcol, key in zip(gcols, GAYA_ID):
-        clr  = GAYA_CLR[key]
+        clr = GAYA_CLR[key]
         mode = GAYA_PROD_MODE[key]
         with gcol:
             st.markdown(
@@ -632,7 +716,7 @@ gambar dan teks — bukan karakter per karakter.
 
     _hr()
 
-    # ── 4. Heatmap gaya × genre ───────────────────────────────────────────────
+    # ── 4. Peta panas gaya × genre ────────────────────────────────────────────
     st.markdown("### Peta Panas Gaya × Genre")
     st.caption("Genre diurutkan K1 → K2 → K3. Garis putus-putus memisahkan antar klaster.")
     hn_gi = st.slider("Jumlah genre", 6, 20, 12, 2, key="hn_gi_blk")
@@ -683,47 +767,50 @@ gambar dan teks — bukan karakter per karakter.
 
     # ── 6. Analisis objek YOLO ────────────────────────────────────────────────
     st.markdown("### Objek yang Terdeteksi dalam Sampul")
+    st.caption(
+        "Objek dideteksi oleh YOLOv8n (COCO-80) dan diterjemahkan ke Bahasa Indonesia. "
+        "Pilih tab untuk melihat distribusi objek per gaya ilustrasi."
+    )
     yolo_col = _detect_yolo_col(DF)
 
     if yolo_col is None:
         st.warning(
             "Kolom data objek YOLO tidak ditemukan. "
             "Pastikan ada kolom bernama salah satu dari: "
-            "`yolo_objek_list`, `yolo_label_list`, `yolo_labels`, `detected_objects`."
+            "`yolo_objek`, `yolo_objek_list`, `yolo_label_list`, atau `detected_objects`."
         )
     else:
-        # 6a. Heatmap objek × genre
+        # 6a. Peta panas objek × genre
         st.markdown("#### Peta Panas Objek × Genre")
         st.caption(
-            "Nilai = % sampul dalam genre tersebut yang mengandung objek tertentu. "
-            "Warna merah tua = objek sangat sering muncul di genre itu."
+            "Nilai = % sampul dalam genre tersebut yang mengandung objek. "
+            "Merah tua = objek sangat sering muncul di genre itu."
         )
         c_hm1, c_hm2 = st.columns(2)
         with c_hm1:
-            n_obj_hm  = st.slider("Top N objek", 10, 40, 20, 5, key="n_obj_hm")
+            n_obj_hm = st.slider("Jumlah objek ditampilkan", 10, 40, 20, 5, key="n_obj_hm")
         with c_hm2:
-            n_genre_hm = st.slider("Top N genre", 8, 20, 14, 2, key="n_genre_hm")
+            n_genre_hm = st.slider("Jumlah genre", 8, 20, 14, 2, key="n_genre_hm")
 
         fig_hm = heatmap_objek_genre(DF, yolo_col,
                                       top_n_obj=n_obj_hm, top_n_genre=n_genre_hm)
         if fig_hm is not None:
             st.plotly_chart(fig_hm, use_container_width=True)
         else:
-            st.info("Tidak ada data objek untuk membuat heatmap.")
+            st.info("Tidak ada data objek untuk membuat peta panas.")
 
         # 6b. Distribusi objek per gaya — tabs
         st.markdown("#### Distribusi Objek per Gaya Ilustrasi")
-        st.caption("Klik tab untuk melihat objek dominan dalam masing-masing gaya.")
 
         def _render_obj_tab(df_sub: pd.DataFrame, tab_key: str, n_top: int = 25):
-            ctr = _parse_yolo_objects(df_sub[yolo_col])
+            ctr = _parse_yolo_objects(df_sub[yolo_col], terjemahkan=True)
             if not ctr:
                 st.info("Tidak ada data objek untuk kategori ini.")
                 return
 
             top_items = ctr.most_common(n_top)
             total_all = sum(ctr.values())
-            df_obj    = pd.DataFrame(top_items, columns=["Objek", "Frekuensi"])
+            df_obj = pd.DataFrame(top_items, columns=["Objek", "Frekuensi"])
             df_obj["Persen (%)"] = (df_obj["Frekuensi"] / total_all * 100).round(1)
 
             co1, co2 = st.columns([2, 1])
@@ -744,7 +831,7 @@ gambar dan teks — bukan karakter per karakter.
                 st.plotly_chart(fig_obj, use_container_width=True)
 
             with co2:
-                st.markdown("**Top 10 objek**")
+                st.markdown("**10 objek terbanyak**")
                 for obj, freq in top_items[:10]:
                     pct = freq / total_all * 100
                     st.markdown(
@@ -756,20 +843,21 @@ gambar dan teks — bukan karakter per karakter.
                         unsafe_allow_html=True,
                     )
 
-            # Cari sampul berdasarkan objek
+            # Temukan sampul berdasarkan objek
             st.markdown("**Temukan sampul berdasarkan objek**")
-            sel_obj = st.selectbox(
-                "Pilih objek", [o for o, _ in top_items[:25]],
-                key=f"obj_sel_{tab_key}",
-            )
+            obj_choices = [o for o, _ in top_items[:25]]
+            sel_obj = st.selectbox("Pilih objek", obj_choices, key=f"obj_sel_{tab_key}")
             if sel_obj:
-                mask_obj   = df_sub[yolo_col].astype(str).str.lower().str.contains(
+                # Cari di kolom asli dengan reverse lookup (Indonesia → Inggris)
+                _rev_map = {v: k for k, v in YOLO_ID.items()}
+                sel_obj_en = _rev_map.get(sel_obj, sel_obj)
+                mask_obj = df_sub[yolo_col].astype(str).str.lower().str.contains(
+                    sel_obj_en.lower(), na=False
+                ) | df_sub[yolo_col].astype(str).str.lower().str.contains(
                     sel_obj.lower(), na=False
                 )
-                df_obj_bk  = df_sub[mask_obj & (df_sub["image_ok"] == True)]
-                st.markdown(
-                    f"**{len(df_obj_bk):,}** sampul mengandung objek *{sel_obj}*"
-                )
+                df_obj_bk = df_sub[mask_obj & (df_sub["image_ok"] == True)]
+                st.markdown(f"**{len(df_obj_bk):,}** sampul mengandung objek **{sel_obj}**")
                 if not df_obj_bk.empty:
                     n_show = st.slider(
                         "Tampilkan", 4, min(16, len(df_obj_bk)), 8, 4,
@@ -783,7 +871,7 @@ gambar dan teks — bukan karakter per karakter.
         obj_tabs = st.tabs(obj_tab_labels)
 
         with obj_tabs[0]:
-            n_top_all = st.slider("Top N objek", 10, 40, 25, 5, key="n_top_obj_all")
+            n_top_all = st.slider("Jumlah objek", 10, 40, 25, 5, key="n_top_obj_all")
             _render_obj_tab(DF, "all", n_top=n_top_all)
 
         for tab_o, gaya_key in zip(obj_tabs[1:], GAYA_ID):
@@ -793,7 +881,7 @@ gambar dan teks — bukan karakter per karakter.
                     st.info(f"Tidak ada sampul {GAYA_ID[gaya_key]}.")
                 else:
                     n_top_g = st.slider(
-                        "Top N objek", 10, 30, 15, 5, key=f"n_top_obj_{gaya_key}"
+                        "Jumlah objek", 10, 30, 15, 5, key=f"n_top_obj_{gaya_key}"
                     )
                     _render_obj_tab(df_g, gaya_key, n_top=n_top_g)
 
@@ -801,9 +889,9 @@ gambar dan teks — bukan karakter per karakter.
 
     # ── 7. Figur manusia ──────────────────────────────────────────────────────
     st.markdown("### Figur Manusia vs Non-Manusia")
-    yh    = int(DF["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE").sum())
-    dh    = int(DF["detr_ada_manusia"].astype(str).str.upper().eq("TRUE").sum())
-    tot   = len(DF)
+    yh = int(DF["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE").sum())
+    dh = int(DF["detr_ada_manusia"].astype(str).str.upper().eq("TRUE").sum())
+    tot = len(DF)
     agree = int((
         DF["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE") &
         DF["detr_ada_manusia"].astype(str).str.upper().eq("TRUE")
@@ -812,18 +900,18 @@ gambar dan teks — bukan karakter per karakter.
     man_a, man_b = st.columns([2, 1])
     with man_a:
         fig_man = go.Figure(data=[
-            go.Bar(name="YOLOv8n", x=["Ada manusia","Tidak ada"],
-                   y=[yh, tot-yh], marker_color=["#66BB6A","rgba(128,128,128,.15)"]),
-            go.Bar(name="DETR",    x=["Ada manusia","Tidak ada"],
-                   y=[dh, tot-dh], marker_color=["#42A5F5","rgba(128,128,128,.08)"]),
+            go.Bar(name="YOLOv8n", x=["Ada manusia", "Tidak ada"],
+                   y=[yh, tot - yh], marker_color=["#66BB6A", "rgba(128,128,128,.15)"]),
+            go.Bar(name="DETR", x=["Ada manusia", "Tidak ada"],
+                   y=[dh, tot - dh], marker_color=["#42A5F5", "rgba(128,128,128,.08)"]),
         ])
         fig_man.update_layout(**pb(240), barmode="group", showlegend=True,
                               legend=dict(orientation="h", y=-.15))
         st.plotly_chart(fig_man, use_container_width=True)
     with man_b:
         st.metric("Sepakat keduanya", f"{agree:,}", f"{agree/tot*100:.1f}%")
-        st.metric("Hanya YOLOv8n",   f"{yh-agree:,}")
-        st.metric("Hanya DETR",      f"{dh-agree:,}")
+        st.metric("Hanya YOLOv8n", f"{yh - agree:,}")
+        st.metric("Hanya DETR", f"{dh - agree:,}")
 
     st.markdown("**Kehadiran figur manusia per gaya**")
     rows_man = []
@@ -831,15 +919,15 @@ gambar dan teks — bukan karakter per karakter.
         sub = DF[DF["gaya_ilustrasi"] == gk]
         if sub.empty:
             continue
-        py  = sub["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE").mean() * 100
+        py = sub["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE").mean() * 100
         pd_ = sub["detr_ada_manusia"].astype(str).str.upper().eq("TRUE").mean() * 100
-        rows_man.append({"Gaya": GAYA_ID[gk], "YOLOv8n": round(py,1), "DETR": round(pd_,1)})
+        rows_man.append({"Gaya": GAYA_ID[gk], "YOLOv8n": round(py, 1), "DETR": round(pd_, 1)})
     if rows_man:
-        df_mg  = pd.DataFrame(rows_man)
+        df_mg = pd.DataFrame(rows_man)
         fig_mg = go.Figure([
             go.Bar(name="YOLOv8n", x=df_mg["Gaya"], y=df_mg["YOLOv8n"],
                    marker_color="#66BB6A"),
-            go.Bar(name="DETR",    x=df_mg["Gaya"], y=df_mg["DETR"],
+            go.Bar(name="DETR", x=df_mg["Gaya"], y=df_mg["DETR"],
                    marker_color="#42A5F5"),
         ])
         fig_mg.update_layout(**pb(260), barmode="group",
@@ -852,15 +940,15 @@ gambar dan teks — bukan karakter per karakter.
 
     # ── 8. Simpangan illustrator ──────────────────────────────────────────────
     st.markdown("### Sampul Dengan vs Tanpa Nama Ilustrator")
-    has_ill  = DF["ILLUSTRATOR"].ne("")
-    n_ill    = has_ill.sum()
+    has_ill = DF["ILLUSTRATOR"].ne("")
+    n_ill = has_ill.sum()
     n_no_ill = (~has_ill).sum()
     if n_ill > 0 and n_no_ill > 0:
-        gc_w   = DF[has_ill]["gaya_ilustrasi"].map(GAYA_ID).value_counts()
-        gc_o   = DF[~has_ill]["gaya_ilustrasi"].map(GAYA_ID).value_counts()
+        gc_w = DF[has_ill]["gaya_ilustrasi"].map(GAYA_ID).value_counts()
+        gc_o = DF[~has_ill]["gaya_ilustrasi"].map(GAYA_ID).value_counts()
         diff_g = (gc_w / n_ill - gc_o / n_no_ill).dropna().sort_values(ascending=False)
-        dg_df  = diff_g.reset_index()
-        dg_df.columns = ["gaya","delta"]
+        dg_df = diff_g.reset_index()
+        dg_df.columns = ["gaya", "delta"]
         fig_dg = px.bar(dg_df, x="delta", y="gaya", orientation="h",
                         color="gaya",
                         color_discrete_map={GAYA_ID[k]: GAYA_CLR[k] for k in GAYA_ID})
@@ -888,7 +976,7 @@ gambar dan teks — bukan karakter per karakter.
         q_gi = st.text_input("Judul / penulis", key="gi_q_blk")
     with r1c2:
         gaya_sel = st.selectbox(
-            "Filter gaya ilustrasi",
+            "Gaya ilustrasi",
             ["Semua"] + [GAYA_ID[k] for k in GAYA_ID],
             key="gi_sel_blk",
         )
@@ -896,7 +984,7 @@ gambar dan teks — bukan karakter per karakter.
         ada_man = st.checkbox("Ada figur manusia", key="gi_man_blk")
     with r2c1:
         genre_sel = st.selectbox(
-            "Filter genre",
+            "Genre",
             ["Semua"] + top_genres_list,
             key="gi_genre_blk",
         )
@@ -908,17 +996,17 @@ gambar dan teks — bukan karakter per karakter.
     dgi = DF[DF["image_ok"] == True].copy()
 
     if q_gi:
-        ql  = q_gi.lower()
+        ql = q_gi.lower()
         dgi = dgi[
             dgi["TITLE"].str.lower().str.contains(ql, na=False) |
             dgi["AUTHOR"].str.lower().str.contains(ql, na=False)
         ]
     if gaya_sel != "Semua":
         grev = {v: k for k, v in GAYA_ID.items()}
-        dgi  = dgi[dgi["gaya_ilustrasi"] == grev.get(gaya_sel, gaya_sel)]
+        dgi = dgi[dgi["gaya_ilustrasi"] == grev.get(gaya_sel, gaya_sel)]
     if genre_sel != "Semua":
         gl_s = expand_genres(dgi["GENRES"], normalize=True)
-        dgi  = dgi[[genre_sel in gl for gl in gl_s]]
+        dgi = dgi[[genre_sel in gl for gl in gl_s]]
     if ada_man:
         dgi = dgi[
             dgi["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE") |
