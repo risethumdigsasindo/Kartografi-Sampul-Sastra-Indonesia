@@ -93,6 +93,274 @@ TYPEFACE_LUPTON = {
 TF_ANALISIS = [k for k in TYPEFACE_ID if k != "unknown"]
 TF_ALL = list(TYPEFACE_ID.keys())
 
+# ── Extended Font → Typeface mapping (untuk re-klasifikasi unknown) ────────────
+# Digunakan oleh _reklasifikasi_unknown() untuk mengisi typeface_kategori
+# yang masih 'unknown' berdasarkan nama font di kolom tipe_font.
+# Semua key dalam huruf kecil agar matching case-insensitive.
+
+EXTENDED_FONT_TO_TYPEFACE = {
+
+    # ── script / handwriting ──────────────────────────────────────────────
+    'merienda':                 'script',
+    'crafty girls':             'script',
+    'over the rainbow':         'script',
+    'parisienne':               'script',
+    'mountains of christmas':   'script',
+    'homemade apple':           'script',
+    'covered by your grace':    'script',
+    'swanky and moo moo':       'script',
+    'zeyada':                   'script',
+    'la belle aurore':          'script',
+    'norican':                  'script',
+    'kiwi maru':                'script',
+    'marck script':             'script',
+    'my soul':                  'script',
+    'euphoria script':          'script',
+    'allura':                   'script',
+    'alex brush':               'script',
+    'petit formal script':      'script',
+    'ruthie':                   'script',
+    'stalemate':                'script',
+    'niconne':                  'script',
+    'tangerine':                'script',
+    'just another hand':        'script',
+    'handlee':                  'script',
+    'rock salt':                'script',
+    'luckiest guy':             'script',
+    'coming soon':              'script',
+    'gochi hand':               'script',
+    'ink free':                 'script',
+    'jua':                      'script',
+    'architects daughter':      'script',
+    'caveat':                   'script',
+    'caveat brush':             'script',
+    'dancing script':           'script',
+    'sacramento':               'script',
+    'great vibes':              'script',
+    'satisfy':                  'script',
+    'permanent marker':         'script',
+    'gloria hallelujah':        'script',
+    'kalam':                    'script',
+    'cookie':                   'script',
+    'yellowtail':               'script',
+    'courgette':                'script',
+    'pinyon script':            'script',
+    'patrick hand':             'script',
+    'indie flower':             'script',
+    'shadows into light':       'script',
+    'amatic sc':                'script',
+    'special elite':            'script',
+    'lobster':                  'script',
+    'pacifico':                 'script',
+    'boogaloo':                 'script',
+    'kaushan script':           'script',
+    'fredoka':                  'script',
+    'abril fatface':            'script',
+    'fredoka one':              'script',
+    'merienda one':             'script',
+    'comfortaa':                'script',
+    'poiret one':               'script',
+
+    # ── Font lokal Indonesia (DaFont) ─────────────────────────────────────
+    'cerita':      'script',
+    'mister':      'script',
+    'kurnia':      'script',
+    'ketika':      'script',
+    'rahasia':     'script',
+    'jakarta':     'sans_serif',
+    'jessica':     'script',
+    'series':      'sans_serif',
+    'pulang':      'script',
+    'catatan':     'script',
+    'indonesia':   'display',
+    'nusantara':   'display',
+    'garuda':      'display',
+    'aksara':      'display',
+    'pena':        'script',
+
+    # ── slab_serif ────────────────────────────────────────────────────────
+    'ultra':            'slab_serif',
+    'kameron':          'slab_serif',
+    'kurale':           'slab_serif',
+    'enriqueta':        'slab_serif',
+    'laila':            'slab_serif',
+    'rokkitt':          'slab_serif',
+    'crete round':      'slab_serif',
+    'eczar':            'slab_serif',
+    'gimenez':          'slab_serif',
+    'kreon':            'slab_serif',
+    'slabo 27px':       'slab_serif',
+    'bree serif':       'slab_serif',
+    'aleo':             'slab_serif',
+    'alfa slab one':    'slab_serif',
+    'rockwell':         'slab_serif',
+    'roboto slab':      'slab_serif',
+    'zilla slab':       'slab_serif',
+    'bitter':           'slab_serif',
+    'arvo':             'slab_serif',
+    'josefin slab':     'slab_serif',
+    'chaparral pro':    'slab_serif',
+    'podkova':          'slab_serif',
+    'rasa':             'slab_serif',
+    'scope one':        'slab_serif',
+    'sura':             'slab_serif',
+
+    # ── modern_serif ──────────────────────────────────────────────────────
+    'gfs didot':            'modern_serif',
+    'noto serif display':   'modern_serif',
+    'unna':                 'modern_serif',
+    'tienne':               'modern_serif',
+    'artifika':             'modern_serif',
+    'cambo':                'modern_serif',
+    'fenix':                'modern_serif',
+    'hedvig letters serif': 'modern_serif',
+    'rufina':               'modern_serif',
+    'bodoni moda':          'modern_serif',
+    'dm serif display':     'modern_serif',
+    'marcellus':            'modern_serif',
+    'cinzel':               'modern_serif',
+    'cinzel decorative':    'modern_serif',
+    'yeseva one':           'modern_serif',
+    'rozha one':            'modern_serif',
+    'fraunces':             'modern_serif',
+    'trajan pro 3':         'modern_serif',
+
+    # ── transitional_serif ────────────────────────────────────────────────
+    'martel':               'transitional_serif',
+    'petrona':              'transitional_serif',
+    'solway':               'transitional_serif',
+    'trocchi':              'transitional_serif',
+    'volkhov':              'transitional_serif',
+    'vollkorn':             'transitional_serif',
+    'playfair display':     'transitional_serif',
+    'playfair display sc':  'transitional_serif',
+    'spectral':             'transitional_serif',
+    'merriweather':         'transitional_serif',
+    'libre baskerville':    'transitional_serif',
+    'noto serif':           'transitional_serif',
+    'ibm plex serif':       'transitional_serif',
+    'vidaloka':             'transitional_serif',
+    'lora':                 'transitional_serif',
+
+    # ── humanist_serif ────────────────────────────────────────────────────
+    'gentium book plus':    'humanist_serif',
+    'karma':                'humanist_serif',
+    'neuton':               'humanist_serif',
+    'proza libre':          'humanist_serif',
+    'vollkorn':             'humanist_serif',
+    'piazzolla':            'humanist_serif',
+    'oranienbaum':          'humanist_serif',
+    'im fell english':      'humanist_serif',
+    'kepler std':           'humanist_serif',
+    'mrs eaves':            'humanist_serif',
+    'sabon next':           'humanist_serif',
+    'almendra':             'humanist_serif',
+    'ff scala':             'humanist_serif',
+    'cormorant':            'humanist_serif',
+    'alegreya':             'humanist_serif',
+    'lustria':              'humanist_serif',
+    'cardo':                'humanist_serif',
+    'judson':               'humanist_serif',
+    'cormorant infant':     'humanist_serif',
+    'philosopher':          'humanist_serif',
+    'cormorant garamond':   'humanist_serif',
+    'garamond':             'humanist_serif',
+    'arno pro':             'humanist_serif',
+    'garamond premier pro': 'humanist_serif',
+    'calluna':              'humanist_serif',
+    'georgia':              'humanist_serif',
+
+    # ── sans_serif ────────────────────────────────────────────────────────
+    'rajdhani':             'sans_serif',
+    'be vietnam pro':       'sans_serif',
+    'ubuntu':               'sans_serif',
+    'hanken grotesk':       'sans_serif',
+    'cairo':                'sans_serif',
+    'brandon grotesque':    'sans_serif',
+    'gill sans nova':       'sans_serif',
+    'itc franklin gothic':  'sans_serif',
+    'teko':                 'sans_serif',
+    'geologica':            'sans_serif',
+    'quicksand':            'sans_serif',
+    'poppins':              'sans_serif',
+    'league spartan':       'sans_serif',
+    'karla':                'sans_serif',
+    'outfit':               'sans_serif',
+    'trebuchet ms':         'sans_serif',
+    'josefin sans':         'sans_serif',
+    'montserrat':           'sans_serif',
+    'ibm plex sans':        'sans_serif',
+    'urbanist':             'sans_serif',
+    'oswald':               'sans_serif',
+
+    # ── display ───────────────────────────────────────────────────────────
+    'creepster':            'display',
+    'pirata one':           'display',
+    'lilita one':           'display',
+    'press start 2p':       'display',
+    'fjalla one':           'display',
+    'almendra display':     'display',
+    'league gothic':        'display',
+    'michroma':             'display',
+    'exo':                  'display',
+    'sancreek':             'display',
+    'pixelify sans':        'display',
+    'gasoek one':           'display',
+    'rubik one':            'display',
+    'grenze gotisch':       'display',
+    'black ops one':        'display',
+    'bangers':              'display',
+    'new rocker':           'display',
+    'bebas neue':           'display',
+    'anton':                'display',
+    'passion one':          'display',
+    'righteous':            'display',
+    'unbounded':            'display',
+    'metamorphous':         'display',
+    'metal mania':          'display',
+    'rye':                  'display',
+    'uncial antiqua':       'display',
+    'impact':               'display',
+    'freight display pro':  'display',
+    'orbitron':             'display',
+    'electrolize':          'display',
+    'audiowide':            'display',
+    'share tech':           'display',
+    'vt323':                'display',
+    'faster one':           'display',
+    'bowlby one sc':        'display',
+    'fredericka the great': 'display',
+    'grenze':               'display',
+}
+
+
+def _reklasifikasi_unknown(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Re-klasifikasi baris ber-typeface_kategori 'unknown' menggunakan
+    EXTENDED_FONT_TO_TYPEFACE berdasarkan kolom tipe_font.
+
+    Menambahkan kolom 'typeface_kategori_reklas' yang merupakan
+    typeface_kategori asli, namun unknown yang berhasil diidentifikasi
+    diganti dengan nilai dari mapping.
+
+    Kolom asli 'typeface_kategori' TIDAK diubah — perubahan hanya pada
+    kolom baru sehingga analisis pipeline asli tetap bisa dibandingkan.
+    """
+    df = df.copy()
+    mapping = {k.lower(): v for k, v in EXTENDED_FONT_TO_TYPEFACE.items()}
+
+    def _resolve(row):
+        cat = str(row.get("typeface_kategori", "unknown") or "unknown").strip()
+        if cat != "unknown":
+            return cat
+        font = str(row.get("tipe_font", "") or "").strip().lower()
+        if font and font in mapping:
+            return mapping[font]
+        return "unknown"
+
+    df["typeface_kategori_reklas"] = df.apply(_resolve, axis=1)
+    return df
+
 FONT_SOURCE_CLR = {
     "Google Fonts": "#4285F4",
     "DaFont":       "#E53935",
@@ -1985,12 +2253,58 @@ def render_tipografi(DF):
             from tipografi_block import render_tipografi
             render_tipografi(DF)
     """
+    # ── Re-klasifikasi unknown via EXTENDED_FONT_TO_TYPEFACE ─────────────────
+    DF = _reklasifikasi_unknown(DF)
+
     st.markdown("## Analisis Tipografi")
     st.markdown(
         "Klasifikasi *typeface* pada 5.069 sampul buku sastra Indonesia (2000–2025) "
         "menggunakan pipeline DB-first v5: EasyOCR → fuzzy matching → Google Fonts/DaFont → CLIP fallback.",
         unsafe_allow_html=False,
     )
+
+    # ── Pilihan kolom klasifikasi ─────────────────────────────────────────────
+    n_orig_unknown  = (DF["typeface_kategori"] == "unknown").sum()
+    n_reklas_unknown = (DF["typeface_kategori_reklas"] == "unknown").sum()
+    n_recovered     = n_orig_unknown - n_reklas_unknown
+
+    with st.expander(
+        f"⚙️ Mode Klasifikasi  —  {n_recovered:,} font berhasil di-recover dari {n_orig_unknown:,} unknown",
+        expanded=True,
+    ):
+        col_mode, col_info = st.columns([2, 3])
+        with col_mode:
+            use_reklas = st.toggle(
+                "Gunakan re-klasifikasi extended",
+                value=True,
+                key="use_reklas_toggle",
+                help=(
+                    "Aktif: pakai EXTENDED_FONT_TO_TYPEFACE untuk mengisi unknown "
+                    "berdasarkan nama font (tipe_font). "
+                    "Nonaktif: hanya pakai typeface_kategori asli dari pipeline v5."
+                ),
+            )
+        with col_info:
+            if use_reklas:
+                st.success(
+                    f"✅ Extended mapping aktif — {n_recovered:,} buku re-klasifikasi. "
+                    f"Sisa unknown: {n_reklas_unknown:,}",
+                    icon=None,
+                )
+            else:
+                st.info(
+                    f"ℹ️ Pipeline v5 original — unknown: {n_orig_unknown:,} buku",
+                    icon=None,
+                )
+
+    # Pilih kolom yang dipakai seluruh tab berdasarkan toggle
+    _KAT_COL = "typeface_kategori_reklas" if use_reklas else "typeface_kategori"
+
+    # Buat salinan DF dengan kolom 'typeface_kategori' diisi dari kolom yang dipilih
+    # agar seluruh fungsi tab tidak perlu diubah (mereka tetap baca 'typeface_kategori')
+    DF = DF.copy()
+    if use_reklas:
+        DF["typeface_kategori"] = DF["typeface_kategori_reklas"]
 
     # ── Kartu tujuh kategori typeface ────────────────────────────────────────
     _section_header(
