@@ -41,10 +41,12 @@ def render_tipografi(df: pd.DataFrame):
     df["typeface_simple"] = df["typeface_kategori"].map(TYPEFACE_SIMPLIFIED)
 
     # explode genre
-    df["genre_list"] = df["GENRES"].fillna("").apply(lambda x: [g.strip() for g in str(x).split(",") if g.strip()])
-    df_exploded = df.explode("genre_list")
+    df["genre_list"] = df["GENRES"].fillna("").apply(
+        lambda x: [g.strip() for g in str(x).split(",") if g.strip()]
+    )
+    df_exploded = df.explode("genre_list").reset_index(drop=True)
     df_exploded["genre_list"] = df_exploded["genre_list"].fillna("Unknown")
-
+    df_exploded["typeface_simple"] = df_exploded["typeface_simple"].fillna("Unknown")
     # ==============================
     # SIDEBAR MENU
     # ==============================
