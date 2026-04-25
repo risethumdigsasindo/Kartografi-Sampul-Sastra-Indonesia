@@ -1002,3 +1002,9 @@ def render_tipografi_4cat(DF):
 
     with tab6:
         tab_metodologi(DF, df_clean)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ALIAS — kompatibilitas dengan import lama di streamlit_app.py
+# ─────────────────────────────────────────────────────────────────────────────
+render_tipografi = render_tipografi_4cat
