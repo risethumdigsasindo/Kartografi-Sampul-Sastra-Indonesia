@@ -875,8 +875,8 @@ elif HAL == "Warna":
 # TIPOGRAFI — delegasi ke tipografi_block.py
 # ══════════════════════════════════════════════════════════════════════════════
 elif HAL == "Tipografi":
-    from tipografi_block import render_tipografi
-    render_tipografi(DF)
+    from tipografi_4cat import render_tipografi_4cat
+    render_tipografi_4cat(DF)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
