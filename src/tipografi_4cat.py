@@ -17,7 +17,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from collections import Counter
 import os
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -120,7 +119,7 @@ GENRE_EXCLUDE = {
 }
 
 # Genre-genre yang masuk analisis
-ALL_GENRES = sorted(set(g for kl in KLASTER for g in kl["genres"]))
+ALL_GENRES = [g for kl in KLASTER for g in kl["genres"]]
 
 COVER_DIR = os.path.join(os.path.dirname(__file__), "..", "covers")
 
@@ -130,20 +129,41 @@ COVER_DIR = os.path.join(os.path.dirname(__file__), "..", "covers")
 # ─────────────────────────────────────────────────────────────────────────────
 
 def expand_genres(series):
-    """Return list of list of normalized genre strings."""
+    """
+    Return list of normalized genre strings per row.
+
+    Prinsip:
+    - Genre yang ada di GENRE_NORM_MAP dinormalisasi dulu.
+    - Semua genre yang eksplisit masuk GENRE_TO_KLASTER selalu dipertahankan.
+      Ini mencegah genre penting seperti Novel/Romansa hilang dari heatmap.
+    - Label generik di GENRE_EXCLUDE dibuang hanya jika bukan genre klaster.
+    """
     out = []
     for v in series:
         if pd.isna(v) or str(v).strip() == "":
             out.append([])
             continue
+
         raw = [g.strip() for g in str(v).split(",") if g.strip()]
         seen, normed = set(), []
+
         for g in raw:
             g2 = GENRE_NORM_MAP.get(g, g)
-            if g2 not in GENRE_EXCLUDE and g2 not in seen:
+
+            if g2 in seen:
+                continue
+
+            if g2 in GENRE_TO_KLASTER:
                 normed.append(g2)
                 seen.add(g2)
+                continue
+
+            if g2 not in GENRE_EXCLUDE:
+                normed.append(g2)
+                seen.add(g2)
+
         out.append(normed)
+
     return out
 
 
@@ -187,9 +207,24 @@ def section_header(title, subtitle="", color="#2E4057", bg="#EEF2F7"):
 
 
 def prepare_df(df):
-    """Filter ke typeface_paper yang valid, tambah genre_norm dan klaster."""
+    """
+    Filter ke typeface_paper yang valid, tambah genre_norm dan klaster.
+
+    Catatan:
+    - Kolom unknown otomatis dibuang karena TYPEFACE_4 hanya berisi
+      Serif, Script, Sans-serif, dan Fancy.
+    - Jika kolom wajib tidak ada, tampilkan pesan error yang jelas.
+    """
+    required_cols = ["typeface_paper", "GENRES"]
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        st.error(f"Kolom wajib tidak ditemukan: {', '.join(missing)}")
+        return pd.DataFrame(columns=list(df.columns) + ["_genre_lists", "genre_norm", "klaster_id"])
+
     df = df.copy()
+    df["typeface_paper"] = df["typeface_paper"].astype(str).str.strip()
     df = df[df["typeface_paper"].isin(TYPEFACE_4)].copy()
+
     gl = expand_genres(df["GENRES"])
     df["_genre_lists"] = gl
 
@@ -224,6 +259,14 @@ def build_crosstab(df, genre_list):
     return mat, counts
 
 
+
+def safe_pct(num, den, digits=1):
+    """Return safe percentage for display."""
+    if den in (0, None) or pd.isna(den):
+        return 0.0
+    return round((num / den) * 100, digits)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # TAB 1: GAMBARAN UMUM
 # ─────────────────────────────────────────────────────────────────────────────
@@ -237,8 +280,8 @@ def tab_gambaran(df, df_clean):
     c1, c2, c3, c4 = st.columns(4)
     stats = [
         ("Total Buku", n_total, "dalam korpus", "#2E4057"),
-        ("Terklasifikasi", n_clean, f"{n_clean/n_total*100:.1f}% dari total", "#1D9E75"),
-        ("Tidak Terklasifikasi", n_unknown, f"{n_unknown/n_total*100:.1f}% dari total", "#BDBDBD"),
+        ("Terklasifikasi", n_clean, f"{safe_pct(n_clean, n_total):.1f}% dari total", "#1D9E75"),
+        ("Tidak Terklasifikasi", n_unknown, f"{safe_pct(n_unknown, n_total):.1f}% dari total", "#BDBDBD"),
         ("Kategori Typeface", 4, "Serif · Script · Sans-serif · Fancy", "#993556"),
     ]
     for col, (lbl, val, sub, clr) in zip([c1, c2, c3, c4], stats):
@@ -326,11 +369,16 @@ def tab_heatmap(df_clean):
         st.info("Data tidak cukup.")
         return
 
-    # Sort by klaster order
-    klaster_order = {g: (["K1", "K2", "K3"].index(GENRE_TO_KLASTER[g]["id"]) * 100 + i)
-                     for kl in KLASTER for i, g in enumerate(kl["genres"])}
-    mat = mat.loc[[g for g in mat.index if g in klaster_order]]
-    mat = mat.sort_values(by=mat.index.tolist(), key=lambda idx: [klaster_order.get(g, 999) for g in idx])
+    # Sort by klaster order.
+    # Jangan pakai sort_values(by=mat.index.tolist()) karena `by` mengacu ke nama kolom,
+    # bukan label index. Itu yang memicu KeyError di pandas.
+    klaster_order = {
+        g: (k_idx * 100 + g_idx)
+        for k_idx, kl in enumerate(KLASTER)
+        for g_idx, g in enumerate(kl["genres"])
+    }
+    ordered_genres = [g for g in ALL_GENRES if g in mat.index]
+    mat = mat.reindex(ordered_genres)
 
     y_labels = [f"{klaster_label(g)}  (n={counts.get(g,0)})" for g in mat.index]
     text_mat = (mat * 100).round(0).astype(int).astype(str) + "%"
@@ -486,6 +534,8 @@ def tab_klaster(df_clean):
         st.markdown("**Heatmap Typeface × Genre dalam Klaster**")
         mat_kl, counts_kl = build_crosstab(sub_kl, kl["genres"])
         if not mat_kl.empty:
+            ordered_kl_genres = [g for g in kl["genres"] if g in mat_kl.index]
+            mat_kl = mat_kl.reindex(ordered_kl_genres)
             y_kl = [f"{g}  (n={counts_kl.get(g,0)})" for g in mat_kl.index]
             text_kl = (mat_kl * 100).round(0).astype(int).astype(str) + "%"
             cscale = {"K1": "Blues", "K2": "RdPu", "K3": "Greens"}.get(kl["id"], "Purples")
@@ -717,7 +767,7 @@ def tab_per_genre(df_clean):
             "abstract": "Abstrak", "collage": "Kolase",
         }
         sub_g = sub[sub["gaya_ilustrasi"].notna()].copy()
-        sub_g["gaya_label"] = sub_g["gaya_ilustrasi"].map(GAYA_ID)
+        sub_g["gaya_label"] = sub_g["gaya_ilustrasi"].map(GAYA_ID).fillna(sub_g["gaya_ilustrasi"].astype(str))
 
         if len(sub_g) >= 5:
             ct = pd.crosstab(sub_g["typeface_paper"], sub_g["gaya_label"], normalize="index")
@@ -761,7 +811,7 @@ def tab_typeface_ilustrasi(df_clean):
     }
 
     sub = df_clean[df_clean["gaya_ilustrasi"].notna()].copy()
-    sub["gaya_label"] = sub["gaya_ilustrasi"].map(GAYA_ID)
+    sub["gaya_label"] = sub["gaya_ilustrasi"].map(GAYA_ID).fillna(sub["gaya_ilustrasi"].astype(str))
 
     col_a, col_b = st.columns(2)
 
