@@ -147,21 +147,25 @@ KLASTER_COOC = [
         "short":"Klaster 1","color":"#2E4057","bg":"#EEF2F7",
         "genres":["Novel","Cerita Pendek","Antologi","Puisi"],
         "pairs":[("Drama","Novel"),("Novel","Remaja"),("Antologi","Cerita Pendek"),
-                 ("Novel","Romansa"),("Fiksi Sejarah","Novel"),("Komedi","Novel")],
+                 ("Novel","Romansa"),("Fiksi Sejarah","Novel")],
+                 # ← hapus ("Komedi","Novel") dari sini
     },
     {
         "id":"K2","label":"Klaster 2 — Romansa sebagai gravitasi genre tematik",
         "short":"Klaster 2","color":"#993556","bg":"#FBF0F3",
-        "genres":["Romansa","Chick Lit","Persahabatan","Remaja","Dewasa","Keluarga","Drama","Slice of Life","Komedi"],
+        "genres":["Romansa","Chick Lit","Persahabatan","Remaja","Dewasa","Keluarga","Drama","Slice of Life"],
+        # ← hapus "Komedi" dari list genres K2
         "pairs":[("Chick Lit","Romansa"),("Persahabatan","Romansa"),("Remaja","Romansa"),
                  ("Dewasa","Romansa"),("Keluarga","Romansa"),("Drama","Romansa")],
     },
     {
         "id":"K3","label":"Klaster 3 — Eskapisme: fantasi, aksi & ketegangan",
         "short":"Klaster 3","color":"#1D9E75","bg":"#EEF8F4",
-        "genres":["Fantasi","Fiksi Sejarah","Petualangan","Anak-anak","Fiksi Sains","Thriller/Misteri","Horor","Anak-anak"],
+        "genres":["Fantasi","Fiksi Sejarah","Petualangan","Anak-anak",
+                  "Fiksi Sains","Thriller/Misteri","Horor","Komedi"],  # ← Komedi masuk K3
         "pairs":[("Fantasi","Fiksi Sains"),("Fantasi","Petualangan"),("Anak-anak","Fantasi"),
-                 ("Anak-anak","Petualangan"),("Horor","Thriller/Misteri"),("Fiksi Sejarah","Novel")],
+                 ("Anak-anak","Petualangan"),("Horor","Thriller/Misteri"),
+                 ("Fiksi Sejarah","Novel"),("Komedi","Horor")],  # ← tambah pair Komedi
     },
 ]
 GENRE_KLASTER_MAP = {}
@@ -883,101 +887,9 @@ elif HAL == "Tipografi":
 # ILUSTRASI
 # ══════════════════════════════════════════════════════════════════════════════
 elif HAL == "Ilustrasi":
-    st.markdown("## Analisis Gaya Ilustrasi")
-
-    with st.expander("Cara kerja analisis ilustrasi", expanded=False):
-        st.markdown(
-            "**YOLOv8n + DETR ResNet-50 + CLIP zero-shot**\n\n"
-            "1. **YOLOv8n** — deteksi objek COCO-80, confidence ≥ 0.25.\n"
-            "2. **DETR ResNet-50** — validator keberadaan manusia, confidence ≥ 0.85.\n"
-            "3. **CLIP ViT-B/32** — klasifikasi 6 gaya visual. **Akurasi ~72%** (200 sampel)."
-        )
-
-    gcols6 = st.columns(6)
-    for gcol, key in zip(gcols6, GAYA_ID):
-        clr = GAYA_CLR[key]
-        with gcol:
-            st.markdown(
-                f'<div style="border:1px solid rgba(128,128,128,.18);border-radius:8px;'
-                f'padding:.55rem .45rem;text-align:center;">'
-                f'<div style="font-size:1.5rem">{GAYA_ICON[key]}</div>'
-                f'<div style="font-size:.66rem;font-weight:600;margin:.2rem 0 .1rem;color:{clr}">{GAYA_ID[key]}</div>'
-                f'<div style="font-size:.58rem;opacity:.55;text-align:left;line-height:1.35">{GAYA_ICON[key]} {key}</div></div>',
-                unsafe_allow_html=True
-            )
-
-    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-    ca, cb = st.columns(2)
-    with ca:
-        st.markdown("**Distribusi Gaya**")
-        gc = DF["gaya_ilustrasi"].map(GAYA_ID).value_counts()
-        fig = px.bar(x=gc.values, y=gc.index, orientation="h",
-                     color=gc.index,
-                     color_discrete_map={GAYA_ID[k]: GAYA_CLR[k] for k in GAYA_ID},
-                     text=gc.values)
-        fig.update_layout(**pb(290), showlegend=False, xaxis_title="", yaxis_title="",
-                          yaxis=dict(categoryorder="total ascending"))
-        fig.update_traces(textposition="outside", marker_line_width=0)
-        st.plotly_chart(fig, use_container_width=True)
-
-    with cb:
-        st.markdown("**Tren Gaya per Tahun**")
-        dfg = DF[(DF["YEAR"]>0) & DF["gaya_ilustrasi"].notna()].copy()
-        dfg["gaya"] = dfg["gaya_ilustrasi"].map(GAYA_ID)
-        trg = dfg.groupby(["YEAR","gaya"]).size().reset_index(name="n")
-        fig2 = px.bar(trg, x="YEAR", y="n", color="gaya", barmode="stack",
-                      color_discrete_map={GAYA_ID[k]: GAYA_CLR[k] for k in GAYA_ID})
-        fig2.update_layout(**pb(290), xaxis_title="", yaxis_title="", showlegend=True,
-                           legend=dict(orientation="h", y=-.2, font=dict(size=9)))
-        st.plotly_chart(fig2, use_container_width=True)
-
-    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-    st.markdown("**Peta Panas Gaya × Genre**")
-    hn_gi = st.slider("Jumlah genre", 6,20,12,2, key="hn_gi")
-    st.plotly_chart(heatmap_gaya_genre(DF, hn_gi), use_container_width=True)
-
-    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-    st.markdown("**Figur Manusia vs Non-Manusia**")
-    yh = int(DF["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE").sum())
-    dh = int(DF["detr_ada_manusia"].astype(str).str.upper().eq("TRUE").sum())
-    tot = len(DF)
-    agree = int((DF["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE") &
-                 DF["detr_ada_manusia"].astype(str).str.upper().eq("TRUE")).sum())
-    man_a, man_b = st.columns([2,1])
-    with man_a:
-        fig_man = go.Figure(data=[
-            go.Bar(name="YOLOv8n", x=["Ada manusia","Tidak ada"], y=[yh,tot-yh],
-                   marker_color=["#66BB6A","rgba(128,128,128,.15)"]),
-            go.Bar(name="DETR", x=["Ada manusia","Tidak ada"], y=[dh,tot-dh],
-                   marker_color=["#42A5F5","rgba(128,128,128,.08)"]),
-        ])
-        fig_man.update_layout(**pb(240), barmode="group", showlegend=True,
-                              legend=dict(orientation="h",y=-.15))
-        st.plotly_chart(fig_man, use_container_width=True)
-    with man_b:
-        st.metric("Sepakat keduanya", f"{agree:,}", f"{agree/tot*100:.1f}%")
-        st.metric("Hanya YOLOv8n", f"{yh-agree:,}")
-        st.metric("Hanya DETR", f"{dh-agree:,}")
-
-    st.markdown("<hr class='thin'>", unsafe_allow_html=True)
-    st.markdown("**Cari Buku berdasarkan Gaya Ilustrasi**")
-    gic1,gic2,gic3,gic4 = st.columns([2,2,1,1])
-    with gic1: q_gi = st.text_input("Judul / penulis", key="gi_q")
-    with gic2: gaya_sel = st.selectbox("Filter gaya", ["Semua"]+[GAYA_ID[k] for k in GAYA_ID], key="gi_sel")
-    with gic3: ada_man = st.checkbox("Ada manusia", key="gi_man")
-    with gic4: n_gi2 = st.slider("Tampilkan", 4,32,8,4, key="gi_n")
-    dgi = DF[DF["image_ok"]].copy()
-    if q_gi:
-        ql3 = q_gi.lower()
-        dgi = dgi[dgi["TITLE"].str.lower().str.contains(ql3,na=False)|dgi["AUTHOR"].str.lower().str.contains(ql3,na=False)]
-    if ada_man:
-        dgi = dgi[dgi["yolo_ada_manusia"].astype(str).str.upper().eq("TRUE")|
-                  dgi["detr_ada_manusia"].astype(str).str.upper().eq("TRUE")]
-    if gaya_sel != "Semua":
-        grev = {v:k for k,v in GAYA_ID.items()}
-        dgi = dgi[dgi["gaya_ilustrasi"]==grev.get(gaya_sel,gaya_sel)]
-    if not dgi.empty: grid(dgi.head(n_gi2), show_gi=True)
-
+    from ilustrasi_block import render_ilustrasi
+    _cover_dir = os.path.join(os.path.dirname(__file__), "..", "covers")
+    render_ilustrasi(DF, cover_dir=_cover_dir)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # GENRE
