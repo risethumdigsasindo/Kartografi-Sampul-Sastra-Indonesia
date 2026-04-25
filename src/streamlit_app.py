@@ -107,8 +107,8 @@ TF_ANALISIS = [k for k in TYPEFACE_ID if k != "unknown"]
 # ── KONSTANTA ILUSTRASI ───────────────────────────────────────────────────────
 GAYA_ID = {
     "photograph":    "Fotografi",
-    "flat_graphic":  "Ilustrasi Datar",
-    "hand_drawn":    "Gambar Tangan",
+    "flat_graphic":  "Ilustrasi Digital",
+    "hand_drawn":    "Ilustrasi Manual",
     "text_dominant": "Dominan Teks",
     "abstract":      "Abstrak",
     "collage":       "Kolase",
@@ -126,16 +126,20 @@ GAYA_PROB_KEYS = ["photograph","hand_drawn","abstract","flat_graphic","text_domi
 SHELF_LABEL = {"fiksi":"Fiksi","puisi-asli":"Puisi"}
 
 GENRE_NORM = {
-    "Cinta":"Romansa","Roman":"Romansa","Romansa Kontemporer":"Romansa",
-    "Kontemporer":"Romansa","Thriller":"Thriller/Misteri","Misteri":"Thriller/Misteri",
-    "Misteri Thriller":"Thriller/Misteri","Thriller Suspense":"Thriller/Misteri",
-    "Psychological Thriller":"Thriller/Misteri","Suspense":"Thriller/Misteri",
-    "Detective":"Thriller/Misteri","Kriminal":"Thriller/Misteri",
-    "Supranatural":"Horor","Humor":"Komedi","Romansatic":"Romansa",
-    "Young Adult Romansace":"Romansa","New Adult":"Remaja",
-    "Collections":"Antologi","Middle Grade":"Fantasi",
-    "Fiksi Ilmiah":"Fiksi Sains","Distopia":"Fiksi Sains",
-    "Sejarah":"Fiksi Sejarah","Historical Fiction":"Fiksi Sejarah","Historical":"Fiksi Sejarah",
+    "Cinta": "Romansa", "Roman": "Romansa",
+    "Romansa Kontemporer": "Romansa",    # ← sudah ada
+    "Romansa kontemporer": "Romansa",    # ← TAMBAHKAN ini (huruf kecil k)
+    "Kontemporer": "Romansa",
+    "Thriller": "Thriller/Misteri", "Misteri": "Thriller/Misteri",
+    "Misteri Thriller": "Thriller/Misteri", "Thriller Suspense": "Thriller/Misteri",
+    "Psychological Thriller": "Thriller/Misteri", "Suspense": "Thriller/Misteri",
+    "Detective": "Thriller/Misteri", "Kriminal": "Thriller/Misteri",
+    "Supranatural": "Horor", "Humor": "Komedi", "Romansatic": "Romansa",
+    "Young Adult Romansace": "Romansa", "New Adult": "Remaja",
+    "Collections": "Antologi", "Middle Grade": "Fantasi",
+    "Fiksi Ilmiah": "Fiksi Sains", "Distopia": "Fiksi Sains",
+    "Sejarah": "Fiksi Sejarah", "Historical Fiction": "Fiksi Sejarah",
+    "Historical": "Fiksi Sejarah",
 }
 _NONFICTION_LOWER = {"nonfiction","non-fiction","nonfiksi","non fiksi","non-fiksi","nonfiction (general)"}
 GENRE_EXCLUDE = {"Sastra Indonesia","Sastra","Fiksi","Nonfiction","Non-fiction",
