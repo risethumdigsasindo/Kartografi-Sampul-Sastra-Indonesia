@@ -35,6 +35,46 @@ CORAK_ID = {
     "fotografi_kolase": "Fotografi / Digital Collage",
 }
 
+
+# Alias agar aman jika CSV berisi label tampil ("Kartunal", "Surealis / Absurd")
+# atau variasi penulisan lain.
+CORAK_ALIAS = {
+    "realisme": "realisme",
+    "realism": "realisme",
+    "realistis": "realisme",
+    "dekoratif": "dekoratif",
+    "decorative": "dekoratif",
+    "kartunal": "kartunal",
+    "kartun": "kartunal",
+    "cartoon": "kartunal",
+    "cartoonal": "kartunal",
+    "ekspresionisme": "ekspresionisme",
+    "expressionism": "ekspresionisme",
+    "surealis_absurd": "surealis_absurd",
+    "surealis / absurd": "surealis_absurd",
+    "surealis/absurd": "surealis_absurd",
+    "surealis": "surealis_absurd",
+    "surreal": "surealis_absurd",
+    "surrealism": "surealis_absurd",
+    "absurd": "surealis_absurd",
+    "absurdisme": "surealis_absurd",
+    "pop_art": "pop_art",
+    "pop art": "pop_art",
+    "kubisme": "kubisme",
+    "cubism": "kubisme",
+    "abstrak": "abstrak",
+    "abstract": "abstrak",
+    "minimalis": "minimalis",
+    "minimalism": "minimalis",
+    "fotografi_kolase": "fotografi_kolase",
+    "fotografi / digital collage": "fotografi_kolase",
+    "fotografi/digital collage": "fotografi_kolase",
+    "fotografi": "fotografi_kolase",
+    "photography": "fotografi_kolase",
+    "digital collage": "fotografi_kolase",
+    "collage": "fotografi_kolase",
+}
+
 CORAK_CLR = {
     "realisme": "#1E88E5",
     "dekoratif": "#43A047",
@@ -218,25 +258,78 @@ def _bool_series(s):
 
 
 def _prepare_df(DF: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalisasi dataframe agar heatmap tidak kosong.
+    Penyebab 0% paling sering:
+    - corak_ilustrasi berisi label tampil seperti "Kartunal" bukan key "kartunal"
+    - ada spasi/capital mismatch
+    - CSV lama masih memakai gaya_ilustrasi/gaya_skor
+    """
     d = DF.copy()
+
+    # Backward compatibility dari kolom lama
     if "gaya_ilustrasi" in d.columns and "corak_ilustrasi" not in d.columns:
         d = d.rename(columns={"gaya_ilustrasi": "corak_ilustrasi"})
     if "gaya_skor" in d.columns and "corak_konfiden" not in d.columns:
         d = d.rename(columns={"gaya_skor": "corak_konfiden"})
+
+    # Normalisasi corak: lowercase + alias → key resmi
     if "corak_ilustrasi" in d.columns:
-        d["corak_ilustrasi"] = d["corak_ilustrasi"].astype(str).str.strip()
-        d.loc[d["corak_ilustrasi"].isin(["nan", "None", ""]), "corak_ilustrasi"] = pd.NA
+        raw = (
+            d["corak_ilustrasi"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+
+        # samakan separator umum
+        raw = (
+            raw
+            .str.replace("-", "_", regex=False)
+            .str.replace("  ", " ", regex=False)
+        )
+
+        d["corak_ilustrasi_raw"] = raw
+        d["corak_ilustrasi"] = raw.map(lambda x: CORAK_ALIAS.get(x, x))
+
+        invalid = ["", "nan", "none", "null", "gagal_load", "error_model"]
+        d.loc[d["corak_ilustrasi"].isin(invalid), "corak_ilustrasi"] = pd.NA
+
+        # buang nilai yang bukan 10 kategori resmi
+        d.loc[~d["corak_ilustrasi"].isin(CORAK_ID.keys()), "corak_ilustrasi"] = pd.NA
+
+    # Confidence
     if "corak_konfiden" in d.columns:
         d["corak_konfiden"] = pd.to_numeric(d["corak_konfiden"], errors="coerce").fillna(0.0)
     else:
         d["corak_konfiden"] = 0.0
+
+    # Normalisasi semua skor corak jika ada
+    for k in CORAK_ID:
+        col = f"corak_skor_{k}"
+        if col in d.columns:
+            d[col] = pd.to_numeric(d[col], errors="coerce").fillna(0.0)
+
+    # Tahun
     if "YEAR" in d.columns:
         d["YEAR"] = pd.to_numeric(d["YEAR"], errors="coerce").fillna(0).astype(int)
+
+    # image_ok
     if "IMAGE_FILE" in d.columns and "image_ok" not in d.columns:
         d["image_ok"] = True
+    elif "image_ok" in d.columns:
+        d["image_ok"] = d["image_ok"].astype(str).str.upper().isin(["TRUE", "1", "YES", "YA"])
+
+    # Illustrator
     if "ILLUSTRATOR" in d.columns:
         d["ILLUSTRATOR"] = d["ILLUSTRATOR"].fillna("").astype(str).str.strip()
-        d.loc[d["ILLUSTRATOR"].isin(["nan", "NaN", "None"]), "ILLUSTRATOR"] = ""
+        d.loc[d["ILLUSTRATOR"].isin(["nan", "NaN", "None", "none"]), "ILLUSTRATOR"] = ""
+
+    # Objek
+    if "objects_count" in d.columns:
+        d["objects_count"] = pd.to_numeric(d["objects_count"], errors="coerce").fillna(0).astype(int)
+
     return d
 
 
@@ -401,6 +494,18 @@ def render_ilustrasi(DF: pd.DataFrame, cover_dir: str = ""):
         return
     valid_mask = DF["corak_ilustrasi"].notna() & ~DF["corak_ilustrasi"].isin(["gagal_load", "error_model", ""])
     D = DF[valid_mask].copy()
+
+    # Debug singkat agar mudah mengecek jika heatmap 0 lagi
+    with st.expander("🔎 Debug data ilustrasi", expanded=False):
+        st.write("Kolom tersedia:", list(DF.columns))
+        st.write("Jumlah baris valid:", len(D))
+        if "corak_ilustrasi" in DF.columns:
+            st.write("Distribusi corak:", DF["corak_ilustrasi"].value_counts(dropna=False).head(20))
+        if "corak_ilustrasi_raw" in DF.columns:
+            st.write("Nilai raw sebelum normalisasi:", DF["corak_ilustrasi_raw"].value_counts(dropna=False).head(20))
+        if "GENRES" in DF.columns:
+            st.write("Contoh GENRES:", DF["GENRES"].head(5).tolist())
+
     with st.expander("📖 Metode analisis ilustrasi", expanded=False):
         st.markdown("""
 Analisis ilustrasi menggunakan **CLIP zero-shot classification** pada level gambar penuh (*whole-image level*).
