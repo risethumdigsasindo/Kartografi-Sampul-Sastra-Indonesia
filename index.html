@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kartografi Sampul Sastra Indonesia 2000–2025</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400&family=DM+Mono:wght@400&display=swap');
+
+  :root {
+    --ink: #1a1410;
+    --ink2: #3d3530;
+    --ink3: #7a6f68;
+    --paper: #faf7f2;
+    --paper2: #f3ede3;
+    --paper3: #e8dfd1;
+    --accent: #8b2e12;
+    --accent2: #c4531e;
+    --rule: rgba(139,46,18,0.18);
+    --col-w: 900px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Source Serif 4', Georgia, serif;
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 17px;
+    line-height: 1.75;
+    font-weight: 300;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 4rem 2rem 3.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 39px,
+      rgba(250,247,242,.04) 39px,
+      rgba(250,247,242,.04) 40px
+    );
+    pointer-events: none;
+  }
+  .header-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin-bottom: 1.2rem;
+  }
+  header h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    font-weight: 600;
+    line-height: 1.18;
+    letter-spacing: -.01em;
+    color: var(--paper);
+    max-width: 760px;
+    margin: 0 auto 1.2rem;
+  }
+  header h1 em {
+    font-style: italic;
+    color: #d9917a;
+  }
+  .header-sub {
+    font-size: 15px;
+    color: rgba(250,247,242,.55);
+    max-width: 560px;
+    margin: 0 auto;
+    font-weight: 300;
+    line-height: 1.6;
+  }
+
+  /* ── NAV ── */
+  nav {
+    background: var(--paper2);
+    border-bottom: 1px solid var(--rule);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    padding: 0 1rem;
+    overflow-x: auto;
+  }
+  nav a {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    text-decoration: none;
+    padding: .9rem 1.3rem;
+    border-bottom: 2px solid transparent;
+    transition: color .2s, border-color .2s;
+    white-space: nowrap;
+  }
+  nav a:hover, nav a.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* ── LAYOUT ── */
+  .container {
+    max-width: var(--col-w);
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  section {
+    padding: 5rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  section:last-child { border-bottom: none; }
+
+  .section-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin-bottom: .6rem;
+    display: block;
+  }
+  h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+    letter-spacing: -.01em;
+  }
+  h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.25rem;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--ink2);
+    margin: 2.5rem 0 .8rem;
+  }
+  p { margin-bottom: 1.2rem; color: var(--ink2); }
+  p:last-child { margin-bottom: 0; }
+
+  .lede {
+    font-size: 1.12rem;
+    line-height: 1.7;
+    color: var(--ink2);
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  /* ── STAT CARDS ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin: 2.5rem 0;
+  }
+  .stat-card {
+    background: var(--paper);
+    padding: 1.5rem 1.4rem;
+    text-align: center;
+  }
+  .stat-num {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2.6rem;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1;
+    display: block;
+    margin-bottom: .4rem;
+  }
+  .stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--ink3);
+  }
+
+  /* ── CHART CONTAINERS ── */
+  .chart-wrap {
+    background: var(--paper2);
+    border: 1px solid var(--rule);
+    padding: 1.8rem 1.8rem 1.2rem;
+    margin: 1.5rem 0;
+    position: relative;
+  }
+  .chart-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    margin-bottom: 1.2rem;
+    padding-bottom: .7rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .chart-note {
+    font-size: 12px;
+    color: var(--ink3);
+    font-style: italic;
+    margin-top: .8rem;
+    line-height: 1.5;
+  }
+
+  /* ── HEATMAP TABLE ── */
+  .heatmap-scroll { overflow-x: auto; }
+  .heatmap-table {
+    border-collapse: collapse;
+    font-size: 12px;
+    width: 100%;
+    min-width: 640px;
+  }
+  .heatmap-table th {
+    font-family: 'DM Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    padding: .5rem .6rem;
+    text-align: center;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+    font-weight: 400;
+  }
+  .heatmap-table th.genre-head { text-align: left; min-width: 120px; }
+  .heatmap-table td {
+    padding: .35rem .4rem;
+    text-align: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--ink);
+    position: relative;
+    transition: outline .1s;
+  }
+  .heatmap-table td.genre-cell {
+    text-align: left;
+    font-family: 'Source Serif 4', serif;
+    font-size: 12px;
+    padding: .35rem .6rem;
+    white-space: nowrap;
+    color: var(--ink2);
+    border-right: 1px solid var(--rule);
+  }
+  .heatmap-table tr:hover td { outline: 1px solid rgba(139,46,18,.3); }
+
+  /* ── LEGEND DOTS ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink3);
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* ── QUOTE / CALLOUT ── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.4rem;
+    background: var(--paper2);
+    margin: 2rem 0;
+    font-style: italic;
+    color: var(--ink2);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  /* ── TOGGLE TABS ── */
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--rule);
+    width: fit-content;
+    margin-bottom: 1.2rem;
+    overflow: hidden;
+  }
+  .tab-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    border: none;
+    background: var(--paper2);
+    color: var(--ink3);
+    padding: .5rem 1.1rem;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    color: var(--paper);
+  }
+
+  /* ── GRID 2-COL ── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+  }
+  @media (max-width: 680px) {
+    .two-col { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    header h1 { font-size: 1.8rem; }
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--ink);
+    color: rgba(250,247,242,.45);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .08em;
+  }
+
+  /* ── PROGRESS BARS (warna dist) ── */
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    margin-bottom: .55rem;
+  }
+  .bar-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10.5px;
+    width: 64px;
+    text-align: right;
+    color: var(--ink3);
+    flex-shrink: 0;
+  }
+  .bar-track {
+    flex: 1;
+    height: 7px;
+    background: var(--paper3);
+    border-radius: 0;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 0;
+    transition: width .5s ease;
+  }
+  .bar-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink3);
+    width: 36px;
+    flex-shrink: 0;
+  }
+
+  /* ── SCROLL INDICATOR ── */
+  #scroll-line {
+    position: fixed;
+    top: 0; left: 0;
+    height: 2px;
+    background: var(--accent);
+    z-index: 999;
+    width: 0%;
+    transition: width .1s linear;
+  }
+</style>
+</head>
+<body>
+<div id="scroll-line"></div>
+
+<header>
+  <p class="header-label">Analisis Komputasional · 5.069 Sampul Buku · 2000–2025</p>
+  <h1>Kartografi Sampul <em>Sastra Indonesia</em></h1>
+  <p class="header-sub">Pemetaan warna, tipografi, dan corak ilustrasi dari lima abad produksi sastra fiksi dan puisi Indonesia melalui pendekatan komputasional.</p>
+</header>
+
+<nav id="main-nav">
+  <a href="#ringkasan" class="active">Ringkasan</a>
+  <a href="#corak">Corak</a>
+  <a href="#warna">Warna</a>
+  <a href="#tipografi">Tipografi</a>
+  <a href="#genre">Genre</a>
+  <a href="#metode">Metode</a>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════ RINGKASAN -->
+<section id="ringkasan">
+<div class="container">
+  <span class="section-num">§ 01</span>
+  <h2>Gambaran Dataset</h2>
+  <p class="lede">
+    Studi ini menganalisis 5.069 sampul buku sastra Indonesia—fiksi dan puisi—yang diterbitkan antara 2000 hingga 2025. Setiap sampul diproses menggunakan empat pipeline komputasional: segmentasi warna K-Means HSV, klasifikasi corak ilustrasi CLIP zero-shot (10 kategori), deteksi tipografi CLIP multi-prompt, dan deteksi objek YOLOv8m/DETR.
+  </p>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <span class="stat-num">5.069</span>
+      <span class="stat-label">Total Sampul</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">10</span>
+      <span class="stat-label">Corak Ilustrasi</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">7</span>
+      <span class="stat-label">Kategori Tipografi</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">57</span>
+      <span class="stat-label">Genre Unik</span>
+    </div>
+  </div>
+
+  <div class="callout">
+    Analisis ini tidak bertujuan menilai estetika, melainkan memetakan pola visual yang berulang—untuk melihat bagaimana wajah sastra Indonesia berubah selama seperempat abad produksi buku.
+  </div>
+
+  <h3>Distribusi terbit per tahun</h3>
+  <div class="chart-wrap">
+    <div class="chart-title">Jumlah sampul per tahun · 2000–2025</div>
+    <div style="position:relative;height:200px;">
+      <canvas id="chartTerbit" aria-label="Bar chart jumlah sampul per tahun 2000 sampai 2025">Data terbit per tahun tersedia dalam bentuk grafik batang.</canvas>
+    </div>
+    <p class="chart-note">Puncak produksi terjadi pada 2014–2017 dengan lebih dari 400 judul per tahun. Penurunan pasca-2020 sebagian dipengaruhi keterbatasan data Goodreads untuk tahun terbaru.</p>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ CORAK -->
+<section id="corak">
+<div class="container">
+  <span class="section-num">§ 02</span>
+  <h2>Corak Ilustrasi</h2>
+  <p class="lede">
+    Setiap sampul diklasifikasikan ke dalam salah satu dari 10 corak ilustrasi menggunakan CLIP zero-shot dengan multi-prompt voting. Corak yang paling dominan—<strong>kartunal</strong> dan <strong>minimalis</strong>—mencerminkan dua kutub pasar: buku populer yang merakyat dan buku dengan cita rasa desain kontemporer.
+  </p>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Distribusi 10 corak ilustrasi · seluruh dataset</div>
+    <div style="position:relative;height:280px;">
+      <canvas id="chartCorakDist" aria-label="Bar chart horizontal distribusi 10 corak ilustrasi">Kartunal adalah corak terbanyak, diikuti minimalis dan ekspresionisme.</canvas>
+    </div>
+  </div>
+
+  <h3>Tren corak per tahun (2000–2025)</h3>
+  <div class="tab-bar" id="tren-tabs">
+    <button class="tab-btn active" data-mode="proporsi">Proporsi</button>
+    <button class="tab-btn" data-mode="jumlah">Jumlah</button>
+  </div>
+  <div class="chart-wrap">
+    <div class="chart-title">Komposisi corak per tahun — stacked bar</div>
+    <div class="legend" id="legend-corak"></div>
+    <div style="position:relative;height:320px;">
+      <canvas id="chartCorakTren" aria-label="Stacked bar chart tren corak ilustrasi per tahun">Tren komposisi corak dari 2000 hingga 2025 dalam grafik batang bertumpuk.</canvas>
+    </div>
+    <p class="chart-note">Ekspresionisme mendominasi awal 2000-an. Kartunal melonjak pada 2004–2006. Minimalis bertumbuh konsisten sejak 2012 dan melampaui kartunal sekitar 2015–2019. Periode 2020-an menunjukkan kemunculan surealis/absurd dan kebangkitan kartunal kembali.</p>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ WARNA -->
+<section id="warna">
+<div class="container">
+  <span class="section-num">§ 03</span>
+  <h2>Peta Warna</h2>
+  <p class="lede">
+    Setiap sampul diurai menjadi lima warna dominan menggunakan K-Means clustering dalam ruang HSV, kemudian diklasifikasikan ke dalam 11 kategori kromatik. Putih—yang mewakili latar bersih dan desain minimalis—adalah warna dominan paling konsisten sepanjang periode, diikuti oranye dan biru yang saling bergantian sebagai aksen utama.
+  </p>
+
+  <div class="two-col">
+    <div class="chart-wrap">
+      <div class="chart-title">Distribusi warna keseluruhan</div>
+      <div style="position:relative;height:260px;">
+        <canvas id="chartWarnaDist" aria-label="Pie chart distribusi warna keseluruhan">Distribusi 11 warna dominan dari seluruh sampul.</canvas>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">Rata-rata komposisi warna per periode</div>
+      <div id="warnaBars" style="padding:.4rem 0;"></div>
+    </div>
+  </div>
+
+  <h3>Tren warna per tahun</h3>
+  <div class="tab-bar" id="warna-tabs">
+    <button class="tab-btn active" data-warna="putih">Putih</button>
+    <button class="tab-btn" data-warna="oranye">Oranye</button>
+    <button class="tab-btn" data-warna="biru">Biru</button>
+    <button class="tab-btn" data-warna="merah">Merah</button>
+    <button class="tab-btn" data-warna="hitam">Hitam</button>
+  </div>
+  <div class="chart-wrap">
+    <div class="chart-title">Tren proporsi warna terpilih · 2000–2025</div>
+    <div style="position:relative;height:240px;">
+      <canvas id="chartWarnaTren" aria-label="Line chart tren warna per tahun">Tren proporsi warna pilihan dari 2000 hingga 2025.</canvas>
+    </div>
+    <p class="chart-note">Klik tombol di atas untuk melihat tren warna berbeda. Putih menunjukkan kenaikan tajam 2012–2018, bersamaan dengan gelombang desain minimalis. Biru menguat signifikan sejak 2021.</p>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ TIPOGRAFI -->
+<section id="tipografi">
+<div class="container">
+  <span class="section-num">§ 04</span>
+  <h2>Tipografi Sampul</h2>
+  <p class="lede">
+    Klasifikasi tipografi dilakukan melalui CLIP multi-prompt dengan lima kandidat font per sampul. Dari 5.069 buku, 2.587 (51%) berhasil diklasifikasikan. Pergeseran yang paling signifikan adalah dominasi <em>modern serif</em> pada dekade pertama yang perlahan tergantikan oleh <em>sans-serif</em> sejak pertengahan 2010-an.
+  </p>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Distribusi tipografi · 2.587 sampul terklasifikasi</div>
+    <div style="position:relative;height:260px;">
+      <canvas id="chartTfDist" aria-label="Bar chart distribusi kategori tipografi">Distribusi 7 kategori tipografi dari seluruh sampul terklasifikasi.</canvas>
+    </div>
+  </div>
+
+  <h3>Pergeseran tipografi per tahun</h3>
+  <div class="chart-wrap">
+    <div class="chart-title">Komposisi tipografi per tahun · proporsi</div>
+    <div class="legend" id="legend-tf"></div>
+    <div style="position:relative;height:300px;">
+      <canvas id="chartTfTren" aria-label="Stacked bar chart tren tipografi per tahun">Pergeseran komposisi tipografi dari 2000 hingga 2025.</canvas>
+    </div>
+    <p class="chart-note">Humanist serif mendominasi 2000–2004 (>35%). Modern serif mengambil alih 2005–2014. Sans-serif tumbuh eksponensial sejak 2012 dan menjadi kategori terbesar pada 2016 dan seterusnya, mencerminkan pengaruh estetika digital dan platform media sosial terhadap desain buku cetak.</p>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ GENRE -->
+<section id="genre">
+<div class="container">
+  <span class="section-num">§ 05</span>
+  <h2>Corak × Genre</h2>
+  <p class="lede">
+    Setiap genre memiliki sidik jari visual yang khas. Heatmap berikut menunjukkan proporsi corak ilustrasi untuk 14 genre teratas. Baris yang lebih gelap menandakan asosiasi yang lebih kuat.
+  </p>
+
+  <div class="callout">
+    <strong>Temuan menonjol:</strong> Chick Lit dan Persahabatan memimpin penggunaan kartunal (&gt;42%). Puisi menghindari kartunal dan justru mendominasi di abstrak dan minimalis. Thriller/Misteri adalah satu-satunya genre dengan ekspresionisme dan surealis/absurd yang sama-sama tinggi.
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Heatmap proporsi corak × genre · % dari sampul per genre</div>
+    <div class="heatmap-scroll">
+      <table class="heatmap-table" id="heatmapTable" aria-label="Tabel heatmap proporsi corak ilustrasi per genre">
+        <thead><tr id="heatmapHead"></tr></thead>
+        <tbody id="heatmapBody"></tbody>
+      </table>
+    </div>
+    <p class="chart-note">Nilai menunjukkan persentase buku dalam genre tersebut yang menggunakan corak bersangkutan. Warna sel: semakin gelap = semakin dominan.</p>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ METODE -->
+<section id="metode">
+<div class="container">
+  <span class="section-num">§ 06</span>
+  <h2>Catatan Metodologis</h2>
+  <p>Dataset dikumpulkan dari platform Goodreads menggunakan scraper berbasis Selenium, dengan filter genre sastra Indonesia (fiksi dan puisi asli). Gambar sampul diunduh dari Goodreads CDN.</p>
+  <p><strong>Pipeline analisis visual</strong> terdiri dari empat modul independen: (1) K-Means HSV untuk segmentasi warna dominan (5 warna per sampul); (2) CLIP ViT-L/14 zero-shot untuk klasifikasi 10 corak ilustrasi dengan multi-prompt voting; (3) CLIP multi-prompt dengan 5 kandidat font per sampul untuk tipografi; dan (4) YOLOv8m + DETR ResNet-50 untuk deteksi objek dan kehadiran manusia.</p>
+  <p>Corak ilustrasi yang tidak melampaui threshold confidence 0,22 dikategorikan ambigu dan dikeluarkan dari analisis korak. Sekitar 49% sampul tidak terklasifikasi tipografinya—terutama karena kualitas gambar rendah atau teks terlalu kecil untuk dianalisis.</p>
+  <p><strong>Keterbatasan:</strong> Data Goodreads mewakili buku yang terdaftar dan dirating oleh pengguna platform, bukan seluruh produksi penerbitan Indonesia. Buku dari penerbit kecil atau self-publishing yang tidak terdaftar di Goodreads tidak tercakup. Distribusi tahun terakhir (2023–2025) kemungkinan under-represented.</p>
+</div>
+</section>
+
+<footer>
+  <p>Kartografi Sampul Sastra Indonesia 2000–2025 · Analisis Komputasional · Data: Goodreads · Pipeline: CLIP · YOLOv8 · K-Means HSV</p>
+</footer>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────
+const DATA = {"stats":{"total_buku":5069,"total_corak":5069,"total_tf":2587,"tahun_range":[2000,2025],"n_genre":57},"tren_corak":[{"YEAR":2000,"corak_norm":"abstrak","n":10,"total":48,"pct":20.83},{"YEAR":2000,"corak_norm":"ekspresionisme","n":16,"total":48,"pct":33.33},{"YEAR":2000,"corak_norm":"fotografi_kolase","n":5,"total":48,"pct":10.42},{"YEAR":2000,"corak_norm":"kartunal","n":11,"total":48,"pct":22.92},{"YEAR":2000,"corak_norm":"kubisme","n":1,"total":48,"pct":2.08},{"YEAR":2000,"corak_norm":"minimalis","n":3,"total":48,"pct":6.25},{"YEAR":2000,"corak_norm":"realisme","n":1,"total":48,"pct":2.08},{"YEAR":2000,"corak_norm":"surealis_absurd","n":1,"total":48,"pct":2.08},{"YEAR":2001,"corak_norm":"abstrak","n":6,"total":52,"pct":11.54},{"YEAR":2001,"corak_norm":"dekoratif","n":2,"total":52,"pct":3.85},{"YEAR":2001,"corak_norm":"ekspresionisme","n":19,"total":52,"pct":36.54},{"YEAR":2001,"corak_norm":"fotografi_kolase","n":6,"total":52,"pct":11.54},{"YEAR":2001,"corak_norm":"kartunal","n":9,"total":52,"pct":17.31},{"YEAR":2001,"corak_norm":"kubisme","n":1,"total":52,"pct":1.92},{"YEAR":2001,"corak_norm":"minimalis","n":6,"total":52,"pct":11.54},{"YEAR":2001,"corak_norm":"pop_art","n":1,"total":52,"pct":1.92},{"YEAR":2001,"corak_norm":"surealis_absurd","n":2,"total":52,"pct":3.85},{"YEAR":2002,"corak_norm":"abstrak","n":15,"total":84,"pct":17.86},{"YEAR":2002,"corak_norm":"dekoratif","n":2,"total":84,"pct":2.38},{"YEAR":2002,"corak_norm":"ekspresionisme","n":31,"total":84,"pct":36.9},{"YEAR":2002,"corak_norm":"fotografi_kolase","n":6,"total":84,"pct":7.14},{"YEAR":2002,"corak_norm":"kartunal","n":17,"total":84,"pct":20.24},{"YEAR":2002,"corak_norm":"minimalis","n":9,"total":84,"pct":10.71},{"YEAR":2002,"corak_norm":"realisme","n":1,"total":84,"pct":1.19},{"YEAR":2002,"corak_norm":"surealis_absurd","n":3,"total":84,"pct":3.57},{"YEAR":2003,"corak_norm":"abstrak","n":15,"total":89,"pct":16.85},{"YEAR":2003,"corak_norm":"dekoratif","n":7,"total":89,"pct":7.87},{"YEAR":2003,"corak_norm":"ekspresionisme","n":35,"total":89,"pct":39.33},{"YEAR":2003,"corak_norm":"fotografi_kolase","n":3,"total":89,"pct":3.37},{"YEAR":2003,"corak_norm":"kartunal","n":21,"total":89,"pct":23.6},{"YEAR":2003,"corak_norm":"minimalis","n":7,"total":89,"pct":7.87},{"YEAR":2003,"corak_norm":"pop_art","n":1,"total":89,"pct":1.12},{"YEAR":2004,"corak_norm":"abstrak","n":13,"total":108,"pct":12.04},{"YEAR":2004,"corak_norm":"dekoratif","n":4,"total":108,"pct":3.7},{"YEAR":2004,"corak_norm":"ekspresionisme","n":31,"total":108,"pct":28.7},{"YEAR":2004,"corak_norm":"fotografi_kolase","n":11,"total":108,"pct":10.19},{"YEAR":2004,"corak_norm":"kartunal","n":37,"total":108,"pct":34.26},{"YEAR":2004,"corak_norm":"minimalis","n":6,"total":108,"pct":5.56},{"YEAR":2004,"corak_norm":"pop_art","n":4,"total":108,"pct":3.7},{"YEAR":2004,"corak_norm":"realisme","n":1,"total":108,"pct":0.93},{"YEAR":2004,"corak_norm":"surealis_absurd","n":1,"total":108,"pct":0.93},{"YEAR":2005,"corak_norm":"abstrak","n":16,"total":136,"pct":11.76},{"YEAR":2005,"corak_norm":"dekoratif","n":3,"total":136,"pct":2.21},{"YEAR":2005,"corak_norm":"ekspresionisme","n":28,"total":136,"pct":20.59},{"YEAR":2005,"corak_norm":"fotografi_kolase","n":11,"total":136,"pct":8.09},{"YEAR":2005,"corak_norm":"kartunal","n":53,"total":136,"pct":38.97},{"YEAR":2005,"corak_norm":"kubisme","n":1,"total":136,"pct":0.74},{"YEAR":2005,"corak_norm":"minimalis","n":19,"total":136,"pct":13.97},{"YEAR":2005,"corak_norm":"pop_art","n":1,"total":136,"pct":0.74},{"YEAR":2005,"corak_norm":"realisme","n":3,"total":136,"pct":2.21},{"YEAR":2005,"corak_norm":"surealis_absurd","n":1,"total":136,"pct":0.74},{"YEAR":2006,"corak_norm":"abstrak","n":7,"total":108,"pct":6.48},{"YEAR":2006,"corak_norm":"dekoratif","n":1,"total":108,"pct":0.93},{"YEAR":2006,"corak_norm":"ekspresionisme","n":22,"total":108,"pct":20.37},{"YEAR":2006,"corak_norm":"fotografi_kolase","n":12,"total":108,"pct":11.11},{"YEAR":2006,"corak_norm":"kartunal","n":50,"total":108,"pct":46.3},{"YEAR":2006,"corak_norm":"minimalis","n":12,"total":108,"pct":11.11},{"YEAR":2006,"corak_norm":"pop_art","n":1,"total":108,"pct":0.93},{"YEAR":2006,"corak_norm":"realisme","n":3,"total":108,"pct":2.78},{"YEAR":2007,"corak_norm":"abstrak","n":12,"total":161,"pct":7.45},{"YEAR":2007,"corak_norm":"dekoratif","n":6,"total":161,"pct":3.73},{"YEAR":2007,"corak_norm":"ekspresionisme","n":38,"total":161,"pct":23.6},{"YEAR":2007,"corak_norm":"fotografi_kolase","n":25,"total":161,"pct":15.53},{"YEAR":2007,"corak_norm":"kartunal","n":53,"total":161,"pct":32.92},{"YEAR":2007,"corak_norm":"minimalis","n":16,"total":161,"pct":9.94},{"YEAR":2007,"corak_norm":"pop_art","n":5,"total":161,"pct":3.11},{"YEAR":2007,"corak_norm":"realisme","n":5,"total":161,"pct":3.11},{"YEAR":2007,"corak_norm":"surealis_absurd","n":1,"total":161,"pct":0.62},{"YEAR":2008,"corak_norm":"abstrak","n":14,"total":154,"pct":9.09},{"YEAR":2008,"corak_norm":"dekoratif","n":5,"total":154,"pct":3.25},{"YEAR":2008,"corak_norm":"ekspresionisme","n":26,"total":154,"pct":16.88},{"YEAR":2008,"corak_norm":"fotografi_kolase","n":21,"total":154,"pct":13.64},{"YEAR":2008,"corak_norm":"kartunal","n":53,"total":154,"pct":34.42},{"YEAR":2008,"corak_norm":"minimalis","n":27,"total":154,"pct":17.53},{"YEAR":2008,"corak_norm":"pop_art","n":2,"total":154,"pct":1.3},{"YEAR":2008,"corak_norm":"realisme","n":4,"total":154,"pct":2.6},{"YEAR":2008,"corak_norm":"surealis_absurd","n":2,"total":154,"pct":1.3},{"YEAR":2009,"corak_norm":"abstrak","n":11,"total":145,"pct":7.59},{"YEAR":2009,"corak_norm":"dekoratif","n":6,"total":145,"pct":4.14},{"YEAR":2009,"corak_norm":"ekspresionisme","n":31,"total":145,"pct":21.38},{"YEAR":2009,"corak_norm":"fotografi_kolase","n":27,"total":145,"pct":18.62},{"YEAR":2009,"corak_norm":"kartunal","n":33,"total":145,"pct":22.76},{"YEAR":2009,"corak_norm":"minimalis","n":30,"total":145,"pct":20.69},{"YEAR":2009,"corak_norm":"realisme","n":6,"total":145,"pct":4.14},{"YEAR":2009,"corak_norm":"surealis_absurd","n":1,"total":145,"pct":0.69},{"YEAR":2010,"corak_norm":"abstrak","n":6,"total":149,"pct":4.03},{"YEAR":2010,"corak_norm":"dekoratif","n":7,"total":149,"pct":4.7},{"YEAR":2010,"corak_norm":"ekspresionisme","n":29,"total":149,"pct":19.46},{"YEAR":2010,"corak_norm":"fotografi_kolase","n":21,"total":149,"pct":14.09},{"YEAR":2010,"corak_norm":"kartunal","n":51,"total":149,"pct":34.23},{"YEAR":2010,"corak_norm":"minimalis","n":27,"total":149,"pct":18.12},{"YEAR":2010,"corak_norm":"realisme","n":4,"total":149,"pct":2.68},{"YEAR":2010,"corak_norm":"surealis_absurd","n":4,"total":149,"pct":2.68},{"YEAR":2011,"corak_norm":"abstrak","n":9,"total":168,"pct":5.36},{"YEAR":2011,"corak_norm":"dekoratif","n":7,"total":168,"pct":4.17},{"YEAR":2011,"corak_norm":"ekspresionisme","n":20,"total":168,"pct":11.9},{"YEAR":2011,"corak_norm":"fotografi_kolase","n":21,"total":168,"pct":12.5},{"YEAR":2011,"corak_norm":"kartunal","n":56,"total":168,"pct":33.33},{"YEAR":2011,"corak_norm":"minimalis","n":36,"total":168,"pct":21.43},{"YEAR":2011,"corak_norm":"pop_art","n":5,"total":168,"pct":2.98},{"YEAR":2011,"corak_norm":"realisme","n":10,"total":168,"pct":5.95},{"YEAR":2011,"corak_norm":"surealis_absurd","n":4,"total":168,"pct":2.38},{"YEAR":2012,"corak_norm":"abstrak","n":13,"total":257,"pct":5.06},{"YEAR":2012,"corak_norm":"dekoratif","n":11,"total":257,"pct":4.28},{"YEAR":2012,"corak_norm":"ekspresionisme","n":33,"total":257,"pct":12.84},{"YEAR":2012,"corak_norm":"fotografi_kolase","n":33,"total":257,"pct":12.84},{"YEAR":2012,"corak_norm":"kartunal","n":75,"total":257,"pct":29.18},{"YEAR":2012,"corak_norm":"minimalis","n":77,"total":257,"pct":29.96},{"YEAR":2012,"corak_norm":"pop_art","n":2,"total":257,"pct":0.78},{"YEAR":2012,"corak_norm":"realisme","n":12,"total":257,"pct":4.67},{"YEAR":2012,"corak_norm":"surealis_absurd","n":1,"total":257,"pct":0.39},{"YEAR":2013,"corak_norm":"abstrak","n":15,"total":306,"pct":4.9},{"YEAR":2013,"corak_norm":"dekoratif","n":11,"total":306,"pct":3.59},{"YEAR":2013,"corak_norm":"ekspresionisme","n":40,"total":306,"pct":13.07},{"YEAR":2013,"corak_norm":"fotografi_kolase","n":31,"total":306,"pct":10.13},{"YEAR":2013,"corak_norm":"kartunal","n":91,"total":306,"pct":29.74},{"YEAR":2013,"corak_norm":"kubisme","n":1,"total":306,"pct":0.33},{"YEAR":2013,"corak_norm":"minimalis","n":88,"total":306,"pct":28.76},{"YEAR":2013,"corak_norm":"pop_art","n":4,"total":306,"pct":1.31},{"YEAR":2013,"corak_norm":"realisme","n":16,"total":306,"pct":5.23},{"YEAR":2013,"corak_norm":"surealis_absurd","n":9,"total":306,"pct":2.94},{"YEAR":2014,"corak_norm":"abstrak","n":20,"total":448,"pct":4.46},{"YEAR":2014,"corak_norm":"dekoratif","n":22,"total":448,"pct":4.91},{"YEAR":2014,"corak_norm":"ekspresionisme","n":66,"total":448,"pct":14.73},{"YEAR":2014,"corak_norm":"fotografi_kolase","n":39,"total":448,"pct":8.71},{"YEAR":2014,"corak_norm":"kartunal","n":141,"total":448,"pct":31.47},{"YEAR":2014,"corak_norm":"minimalis","n":130,"total":448,"pct":29.02},{"YEAR":2014,"corak_norm":"pop_art","n":4,"total":448,"pct":0.89},{"YEAR":2014,"corak_norm":"realisme","n":14,"total":448,"pct":3.12},{"YEAR":2014,"corak_norm":"surealis_absurd","n":12,"total":448,"pct":2.68},{"YEAR":2015,"corak_norm":"abstrak","n":16,"total":473,"pct":3.38},{"YEAR":2015,"corak_norm":"dekoratif","n":25,"total":473,"pct":5.29},{"YEAR":2015,"corak_norm":"ekspresionisme","n":82,"total":473,"pct":17.34},{"YEAR":2015,"corak_norm":"fotografi_kolase","n":42,"total":473,"pct":8.88},{"YEAR":2015,"corak_norm":"kartunal","n":118,"total":473,"pct":24.95},{"YEAR":2015,"corak_norm":"kubisme","n":2,"total":473,"pct":0.42},{"YEAR":2015,"corak_norm":"minimalis","n":149,"total":473,"pct":31.5},{"YEAR":2015,"corak_norm":"pop_art","n":15,"total":473,"pct":3.17},{"YEAR":2015,"corak_norm":"realisme","n":17,"total":473,"pct":3.59},{"YEAR":2015,"corak_norm":"surealis_absurd","n":7,"total":473,"pct":1.48},{"YEAR":2016,"corak_norm":"abstrak","n":15,"total":437,"pct":3.43},{"YEAR":2016,"corak_norm":"dekoratif","n":22,"total":437,"pct":5.03},{"YEAR":2016,"corak_norm":"ekspresionisme","n":84,"total":437,"pct":19.22},{"YEAR":2016,"corak_norm":"fotografi_kolase","n":29,"total":437,"pct":6.64},{"YEAR":2016,"corak_norm":"kartunal","n":101,"total":437,"pct":23.11},{"YEAR":2016,"corak_norm":"kubisme","n":2,"total":437,"pct":0.46},{"YEAR":2016,"corak_norm":"minimalis","n":147,"total":437,"pct":33.64},{"YEAR":2016,"corak_norm":"pop_art","n":10,"total":437,"pct":2.29},{"YEAR":2016,"corak_norm":"realisme","n":18,"total":437,"pct":4.12},{"YEAR":2016,"corak_norm":"surealis_absurd","n":9,"total":437,"pct":2.06},{"YEAR":2017,"corak_norm":"abstrak","n":31,"total":504,"pct":6.15},{"YEAR":2017,"corak_norm":"dekoratif","n":26,"total":504,"pct":5.16},{"YEAR":2017,"corak_norm":"ekspresionisme","n":81,"total":504,"pct":16.07},{"YEAR":2017,"corak_norm":"fotografi_kolase","n":21,"total":504,"pct":4.17},{"YEAR":2017,"corak_norm":"kartunal","n":124,"total":504,"pct":24.6},{"YEAR":2017,"corak_norm":"kubisme","n":5,"total":504,"pct":0.99},{"YEAR":2017,"corak_norm":"minimalis","n":163,"total":504,"pct":32.34},{"YEAR":2017,"corak_norm":"pop_art","n":18,"total":504,"pct":3.57},{"YEAR":2017,"corak_norm":"realisme","n":23,"total":504,"pct":4.56},{"YEAR":2017,"corak_norm":"surealis_absurd","n":12,"total":504,"pct":2.38},{"YEAR":2018,"corak_norm":"abstrak","n":10,"total":366,"pct":2.73},{"YEAR":2018,"corak_norm":"dekoratif","n":24,"total":366,"pct":6.56},{"YEAR":2018,"corak_norm":"ekspresionisme","n":69,"total":366,"pct":18.85},{"YEAR":2018,"corak_norm":"fotografi_kolase","n":20,"total":366,"pct":5.46},{"YEAR":2018,"corak_norm":"kartunal","n":76,"total":366,"pct":20.77},{"YEAR":2018,"corak_norm":"kubisme","n":1,"total":366,"pct":0.27},{"YEAR":2018,"corak_norm":"minimalis","n":119,"total":366,"pct":32.51},{"YEAR":2018,"corak_norm":"pop_art","n":17,"total":366,"pct":4.64},{"YEAR":2018,"corak_norm":"realisme","n":22,"total":366,"pct":6.01},{"YEAR":2018,"corak_norm":"surealis_absurd","n":8,"total":366,"pct":2.19},{"YEAR":2019,"corak_norm":"abstrak","n":11,"total":268,"pct":4.1},{"YEAR":2019,"corak_norm":"dekoratif","n":9,"total":268,"pct":3.36},{"YEAR":2019,"corak_norm":"ekspresionisme","n":42,"total":268,"pct":15.67},{"YEAR":2019,"corak_norm":"fotografi_kolase","n":18,"total":268,"pct":6.72},{"YEAR":2019,"corak_norm":"kartunal","n":59,"total":268,"pct":22.01},{"YEAR":2019,"corak_norm":"kubisme","n":3,"total":268,"pct":1.12},{"YEAR":2019,"corak_norm":"minimalis","n":91,"total":268,"pct":33.96},{"YEAR":2019,"corak_norm":"pop_art","n":7,"total":268,"pct":2.61},{"YEAR":2019,"corak_norm":"realisme","n":12,"total":268,"pct":4.48},{"YEAR":2019,"corak_norm":"surealis_absurd","n":16,"total":268,"pct":5.97},{"YEAR":2020,"corak_norm":"abstrak","n":10,"total":215,"pct":4.65},{"YEAR":2020,"corak_norm":"dekoratif","n":7,"total":215,"pct":3.26},{"YEAR":2020,"corak_norm":"ekspresionisme","n":41,"total":215,"pct":19.07},{"YEAR":2020,"corak_norm":"fotografi_kolase","n":12,"total":215,"pct":5.58},{"YEAR":2020,"corak_norm":"kartunal","n":46,"total":215,"pct":21.4},{"YEAR":2020,"corak_norm":"kubisme","n":1,"total":215,"pct":0.47},{"YEAR":2020,"corak_norm":"minimalis","n":69,"total":215,"pct":32.09},{"YEAR":2020,"corak_norm":"pop_art","n":1,"total":215,"pct":0.47},{"YEAR":2020,"corak_norm":"realisme","n":13,"total":215,"pct":6.05},{"YEAR":2020,"corak_norm":"surealis_absurd","n":15,"total":215,"pct":6.98},{"YEAR":2021,"corak_norm":"abstrak","n":9,"total":111,"pct":8.11},{"YEAR":2021,"corak_norm":"dekoratif","n":9,"total":111,"pct":8.11},{"YEAR":2021,"corak_norm":"ekspresionisme","n":15,"total":111,"pct":13.51},{"YEAR":2021,"corak_norm":"fotografi_kolase","n":5,"total":111,"pct":4.5},{"YEAR":2021,"corak_norm":"kartunal","n":29,"total":111,"pct":26.13},{"YEAR":2021,"corak_norm":"minimalis","n":34,"total":111,"pct":30.63},{"YEAR":2021,"corak_norm":"pop_art","n":2,"total":111,"pct":1.8},{"YEAR":2021,"corak_norm":"realisme","n":3,"total":111,"pct":2.7},{"YEAR":2021,"corak_norm":"surealis_absurd","n":5,"total":111,"pct":4.5},{"YEAR":2022,"corak_norm":"abstrak","n":4,"total":75,"pct":5.33},{"YEAR":2022,"corak_norm":"dekoratif","n":10,"total":75,"pct":13.33},{"YEAR":2022,"corak_norm":"ekspresionisme","n":15,"total":75,"pct":20.0},{"YEAR":2022,"corak_norm":"fotografi_kolase","n":3,"total":75,"pct":4.0},{"YEAR":2022,"corak_norm":"kartunal","n":14,"total":75,"pct":18.67},{"YEAR":2022,"corak_norm":"kubisme","n":1,"total":75,"pct":1.33},{"YEAR":2022,"corak_norm":"minimalis","n":16,"total":75,"pct":21.33},{"YEAR":2022,"corak_norm":"pop_art","n":3,"total":75,"pct":4.0},{"YEAR":2022,"corak_norm":"realisme","n":3,"total":75,"pct":4.0},{"YEAR":2022,"corak_norm":"surealis_absurd","n":6,"total":75,"pct":8.0},{"YEAR":2023,"corak_norm":"abstrak","n":4,"total":90,"pct":4.44},{"YEAR":2023,"corak_norm":"dekoratif","n":9,"total":90,"pct":10.0},{"YEAR":2023,"corak_norm":"ekspresionisme","n":19,"total":90,"pct":21.11},{"YEAR":2023,"corak_norm":"fotografi_kolase","n":1,"total":90,"pct":1.11},{"YEAR":2023,"corak_norm":"kartunal","n":34,"total":90,"pct":37.78},{"YEAR":2023,"corak_norm":"minimalis","n":12,"total":90,"pct":13.33},{"YEAR":2023,"corak_norm":"pop_art","n":1,"total":90,"pct":1.11},{"YEAR":2023,"corak_norm":"realisme","n":4,"total":90,"pct":4.44},{"YEAR":2023,"corak_norm":"surealis_absurd","n":6,"total":90,"pct":6.67},{"YEAR":2024,"corak_norm":"abstrak","n":4,"total":86,"pct":4.65},{"YEAR":2024,"corak_norm":"dekoratif","n":5,"total":86,"pct":5.81},{"YEAR":2024,"corak_norm":"ekspresionisme","n":19,"total":86,"pct":22.09},{"YEAR":2024,"corak_norm":"fotografi_kolase","n":2,"total":86,"pct":2.33},{"YEAR":2024,"corak_norm":"kartunal","n":18,"total":86,"pct":20.93},{"YEAR":2024,"corak_norm":"minimalis","n":15,"total":86,"pct":17.44},{"YEAR":2024,"corak_norm":"pop_art","n":8,"total":86,"pct":9.3},{"YEAR":2024,"corak_norm":"realisme","n":3,"total":86,"pct":3.49},{"YEAR":2024,"corak_norm":"surealis_absurd","n":12,"total":86,"pct":13.95},{"YEAR":2025,"corak_norm":"abstrak","n":1,"total":31,"pct":3.23},{"YEAR":2025,"corak_norm":"dekoratif","n":1,"total":31,"pct":3.23},{"YEAR":2025,"corak_norm":"ekspresionisme","n":6,"total":31,"pct":19.35},{"YEAR":2025,"corak_norm":"kartunal","n":11,"total":31,"pct":35.48},{"YEAR":2025,"corak_norm":"kubisme","n":1,"total":31,"pct":3.23},{"YEAR":2025,"corak_norm":"minimalis","n":7,"total":31,"pct":22.58},{"YEAR":2025,"corak_norm":"realisme","n":2,"total":31,"pct":6.45},{"YEAR":2025,"corak_norm":"surealis_absurd","n":2,"total":31,"pct":6.45}],"warna_tren":[{"tahun":2000,"warna":"putih","pct":29.05},{"tahun":2000,"warna":"oranye","pct":17.76},{"tahun":2000,"warna":"cokelat","pct":5.59},{"tahun":2000,"warna":"biru","pct":12.04},{"tahun":2000,"warna":"merah","pct":6.56},{"tahun":2000,"warna":"pink","pct":3.88},{"tahun":2000,"warna":"hitam","pct":4.15},{"tahun":2000,"warna":"kuning","pct":6.09},{"tahun":2000,"warna":"ungu","pct":5.62},{"tahun":2000,"warna":"hijau","pct":2.64},{"tahun":2000,"warna":"abu","pct":6.62},{"tahun":2001,"warna":"putih","pct":25.78},{"tahun":2001,"warna":"oranye","pct":13.04},{"tahun":2001,"warna":"cokelat","pct":4.45},{"tahun":2001,"warna":"biru","pct":10.67},{"tahun":2001,"warna":"merah","pct":4.81},{"tahun":2001,"warna":"pink","pct":3.34},{"tahun":2001,"warna":"hitam","pct":7.22},{"tahun":2001,"warna":"kuning","pct":10.24},{"tahun":2001,"warna":"ungu","pct":6.11},{"tahun":2001,"warna":"hijau","pct":5.92},{"tahun":2001,"warna":"abu","pct":8.41},{"tahun":2002,"warna":"putih","pct":25.23},{"tahun":2002,"warna":"oranye","pct":12.13},{"tahun":2002,"warna":"biru","pct":11.94},{"tahun":2002,"warna":"merah","pct":6.58},{"tahun":2002,"warna":"hitam","pct":9.36},{"tahun":2003,"warna":"putih","pct":26.7},{"tahun":2003,"warna":"oranye","pct":15.74},{"tahun":2003,"warna":"biru","pct":14.77},{"tahun":2003,"warna":"merah","pct":6.01},{"tahun":2003,"warna":"hitam","pct":6.47},{"tahun":2004,"warna":"putih","pct":23.72},{"tahun":2004,"warna":"oranye","pct":18.3},{"tahun":2004,"warna":"biru","pct":14.7},{"tahun":2004,"warna":"merah","pct":6.72},{"tahun":2004,"warna":"hitam","pct":5.84},{"tahun":2005,"warna":"putih","pct":24.63},{"tahun":2005,"warna":"oranye","pct":13.12},{"tahun":2005,"warna":"biru","pct":14.68},{"tahun":2005,"warna":"merah","pct":5.81},{"tahun":2005,"warna":"hitam","pct":8.57},{"tahun":2006,"warna":"putih","pct":23.1},{"tahun":2006,"warna":"oranye","pct":14.78},{"tahun":2006,"warna":"biru","pct":12.35},{"tahun":2006,"warna":"merah","pct":6.34},{"tahun":2006,"warna":"hitam","pct":7.57},{"tahun":2007,"warna":"putih","pct":29.52},{"tahun":2007,"warna":"oranye","pct":17.06},{"tahun":2007,"warna":"biru","pct":10.3},{"tahun":2007,"warna":"merah","pct":5.67},{"tahun":2007,"warna":"hitam","pct":7.36},{"tahun":2008,"warna":"putih","pct":25.57},{"tahun":2008,"warna":"oranye","pct":18.02},{"tahun":2008,"warna":"biru","pct":7.63},{"tahun":2008,"warna":"merah","pct":6.05},{"tahun":2008,"warna":"hitam","pct":7.97},{"tahun":2009,"warna":"putih","pct":26.52},{"tahun":2009,"warna":"oranye","pct":15.41},{"tahun":2009,"warna":"biru","pct":8.94},{"tahun":2009,"warna":"merah","pct":7.57},{"tahun":2009,"warna":"hitam","pct":11.61},{"tahun":2010,"warna":"putih","pct":24.99},{"tahun":2010,"warna":"oranye","pct":15.74},{"tahun":2010,"warna":"biru","pct":11.04},{"tahun":2010,"warna":"merah","pct":6.17},{"tahun":2010,"warna":"hitam","pct":9.37},{"tahun":2011,"warna":"putih","pct":25.24},{"tahun":2011,"warna":"oranye","pct":19.12},{"tahun":2011,"warna":"biru","pct":10.39},{"tahun":2011,"warna":"merah","pct":6.71},{"tahun":2011,"warna":"hitam","pct":10.65},{"tahun":2012,"warna":"putih","pct":30.58},{"tahun":2012,"warna":"oranye","pct":15.77},{"tahun":2012,"warna":"biru","pct":13.27},{"tahun":2012,"warna":"merah","pct":5.45},{"tahun":2012,"warna":"hitam","pct":7.07},{"tahun":2013,"warna":"putih","pct":27.4},{"tahun":2013,"warna":"oranye","pct":20.78},{"tahun":2013,"warna":"biru","pct":11.34},{"tahun":2013,"warna":"merah","pct":4.89},{"tahun":2013,"warna":"hitam","pct":8.28},{"tahun":2014,"warna":"putih","pct":34.14},{"tahun":2014,"warna":"oranye","pct":16.03},{"tahun":2014,"warna":"biru","pct":12.53},{"tahun":2014,"warna":"merah","pct":5.31},{"tahun":2014,"warna":"hitam","pct":7.04},{"tahun":2015,"warna":"putih","pct":32.54},{"tahun":2015,"warna":"oranye","pct":13.01},{"tahun":2015,"warna":"biru","pct":12.2},{"tahun":2015,"warna":"merah","pct":5.14},{"tahun":2015,"warna":"hitam","pct":9.66},{"tahun":2016,"warna":"putih","pct":34.64},{"tahun":2016,"warna":"oranye","pct":12.27},{"tahun":2016,"warna":"biru","pct":13.54},{"tahun":2016,"warna":"merah","pct":6.8},{"tahun":2016,"warna":"hitam","pct":8.09},{"tahun":2017,"warna":"putih","pct":38.32},{"tahun":2017,"warna":"oranye","pct":10.38},{"tahun":2017,"warna":"biru","pct":13.85},{"tahun":2017,"warna":"merah","pct":4.65},{"tahun":2017,"warna":"hitam","pct":9.85},{"tahun":2018,"warna":"putih","pct":36.41},{"tahun":2018,"warna":"oranye","pct":11.19},{"tahun":2018,"warna":"biru","pct":14.7},{"tahun":2018,"warna":"merah","pct":5.31},{"tahun":2018,"warna":"hitam","pct":8.84},{"tahun":2019,"warna":"putih","pct":32.15},{"tahun":2019,"warna":"oranye","pct":14.43},{"tahun":2019,"warna":"biru","pct":12.47},{"tahun":2019,"warna":"merah","pct":5.22},{"tahun":2019,"warna":"hitam","pct":11.69},{"tahun":2020,"warna":"putih","pct":28.73},{"tahun":2020,"warna":"oranye","pct":14.59},{"tahun":2020,"warna":"biru","pct":13.19},{"tahun":2020,"warna":"merah","pct":6.36},{"tahun":2020,"warna":"hitam","pct":10.81},{"tahun":2021,"warna":"putih","pct":26.36},{"tahun":2021,"warna":"oranye","pct":12.26},{"tahun":2021,"warna":"biru","pct":21.18},{"tahun":2021,"warna":"merah","pct":6.15},{"tahun":2021,"warna":"hitam","pct":10.15},{"tahun":2022,"warna":"putih","pct":25.79},{"tahun":2022,"warna":"oranye","pct":13.17},{"tahun":2022,"warna":"biru","pct":17.48},{"tahun":2022,"warna":"merah","pct":7.54},{"tahun":2022,"warna":"hitam","pct":7.77},{"tahun":2023,"warna":"putih","pct":26.22},{"tahun":2023,"warna":"oranye","pct":12.0},{"tahun":2023,"warna":"biru","pct":14.04},{"tahun":2023,"warna":"merah","pct":6.85},{"tahun":2023,"warna":"hitam","pct":6.13},{"tahun":2024,"warna":"putih","pct":21.46},{"tahun":2024,"warna":"oranye","pct":13.25},{"tahun":2024,"warna":"biru","pct":20.17},{"tahun":2024,"warna":"merah","pct":8.0},{"tahun":2024,"warna":"hitam","pct":8.42},{"tahun":2025,"warna":"putih","pct":21.03},{"tahun":2025,"warna":"oranye","pct":11.23},{"tahun":2025,"warna":"biru","pct":21.46},{"tahun":2025,"warna":"merah","pct":4.38},{"tahun":2025,"warna":"hitam","pct":5.6}],"heatmap":[{"genre":"Romansa","corak":"kartunal","pct":32.2},{"genre":"Romansa","corak":"minimalis","pct":30.1},{"genre":"Romansa","corak":"ekspresionisme","pct":11.3},{"genre":"Romansa","corak":"fotografi_kolase","pct":6.9},{"genre":"Romansa","corak":"abstrak","pct":3.4},{"genre":"Romansa","corak":"dekoratif","pct":6.4},{"genre":"Romansa","corak":"realisme","pct":5.2},{"genre":"Romansa","corak":"surealis_absurd","pct":1.1},{"genre":"Romansa","corak":"pop_art","pct":3.1},{"genre":"Romansa","corak":"kubisme","pct":0.1},{"genre":"Novel","corak":"kartunal","pct":30.4},{"genre":"Novel","corak":"minimalis","pct":25.4},{"genre":"Novel","corak":"ekspresionisme","pct":14.0},{"genre":"Novel","corak":"fotografi_kolase","pct":8.0},{"genre":"Novel","corak":"abstrak","pct":5.0},{"genre":"Novel","corak":"dekoratif","pct":6.4},{"genre":"Novel","corak":"realisme","pct":5.2},{"genre":"Novel","corak":"surealis_absurd","pct":3.0},{"genre":"Novel","corak":"pop_art","pct":2.3},{"genre":"Novel","corak":"kubisme","pct":0.2},{"genre":"Puisi","corak":"kartunal","pct":9.8},{"genre":"Puisi","corak":"minimalis","pct":32.1},{"genre":"Puisi","corak":"ekspresionisme","pct":24.5},{"genre":"Puisi","corak":"fotografi_kolase","pct":7.6},{"genre":"Puisi","corak":"abstrak","pct":16.1},{"genre":"Puisi","corak":"dekoratif","pct":3.9},{"genre":"Puisi","corak":"realisme","pct":0.9},{"genre":"Puisi","corak":"surealis_absurd","pct":3.3},{"genre":"Puisi","corak":"pop_art","pct":1.2},{"genre":"Puisi","corak":"kubisme","pct":0.5},{"genre":"Remaja","corak":"kartunal","pct":38.9},{"genre":"Remaja","corak":"minimalis","pct":26.0},{"genre":"Remaja","corak":"ekspresionisme","pct":9.8},{"genre":"Remaja","corak":"fotografi_kolase","pct":4.7},{"genre":"Remaja","corak":"abstrak","pct":2.3},{"genre":"Remaja","corak":"dekoratif","pct":6.4},{"genre":"Remaja","corak":"realisme","pct":5.8},{"genre":"Remaja","corak":"surealis_absurd","pct":1.7},{"genre":"Remaja","corak":"pop_art","pct":4.0},{"genre":"Remaja","corak":"kubisme","pct":0.4},{"genre":"Cerita Pendek","corak":"kartunal","pct":24.0},{"genre":"Cerita Pendek","corak":"minimalis","pct":25.2},{"genre":"Cerita Pendek","corak":"ekspresionisme","pct":22.1},{"genre":"Cerita Pendek","corak":"fotografi_kolase","pct":6.2},{"genre":"Cerita Pendek","corak":"abstrak","pct":7.0},{"genre":"Cerita Pendek","corak":"dekoratif","pct":3.9},{"genre":"Cerita Pendek","corak":"realisme","pct":1.9},{"genre":"Cerita Pendek","corak":"surealis_absurd","pct":7.4},{"genre":"Cerita Pendek","corak":"pop_art","pct":2.3},{"genre":"Cerita Pendek","corak":"kubisme","pct":0},{"genre":"Fantasi","corak":"kartunal","pct":28.0},{"genre":"Fantasi","corak":"minimalis","pct":13.2},{"genre":"Fantasi","corak":"ekspresionisme","pct":20.6},{"genre":"Fantasi","corak":"fotografi_kolase","pct":6.6},{"genre":"Fantasi","corak":"abstrak","pct":5.3},{"genre":"Fantasi","corak":"dekoratif","pct":9.9},{"genre":"Fantasi","corak":"realisme","pct":9.5},{"genre":"Fantasi","corak":"surealis_absurd","pct":4.1},{"genre":"Fantasi","corak":"pop_art","pct":1.6},{"genre":"Fantasi","corak":"kubisme","pct":1.2},{"genre":"Drama","corak":"kartunal","pct":32.3},{"genre":"Drama","corak":"minimalis","pct":29.7},{"genre":"Drama","corak":"ekspresionisme","pct":14.4},{"genre":"Drama","corak":"fotografi_kolase","pct":5.6},{"genre":"Drama","corak":"abstrak","pct":5.6},{"genre":"Drama","corak":"dekoratif","pct":7.2},{"genre":"Drama","corak":"realisme","pct":3.6},{"genre":"Drama","corak":"surealis_absurd","pct":1.5},{"genre":"Drama","corak":"pop_art","pct":0},{"genre":"Drama","corak":"kubisme","pct":0},{"genre":"Chick Lit","corak":"kartunal","pct":42.1},{"genre":"Chick Lit","corak":"minimalis","pct":29.8},{"genre":"Chick Lit","corak":"ekspresionisme","pct":10.1},{"genre":"Chick Lit","corak":"fotografi_kolase","pct":7.3},{"genre":"Chick Lit","corak":"abstrak","pct":1.7},{"genre":"Chick Lit","corak":"dekoratif","pct":4.5},{"genre":"Chick Lit","corak":"realisme","pct":1.7},{"genre":"Chick Lit","corak":"surealis_absurd","pct":0},{"genre":"Chick Lit","corak":"pop_art","pct":2.8},{"genre":"Chick Lit","corak":"kubisme","pct":0},{"genre":"Thriller/Misteri","corak":"kartunal","pct":27.6},{"genre":"Thriller/Misteri","corak":"minimalis","pct":24.1},{"genre":"Thriller/Misteri","corak":"ekspresionisme","pct":24.7},{"genre":"Thriller/Misteri","corak":"fotografi_kolase","pct":5.9},{"genre":"Thriller/Misteri","corak":"abstrak","pct":2.4},{"genre":"Thriller/Misteri","corak":"dekoratif","pct":1.8},{"genre":"Thriller/Misteri","corak":"realisme","pct":4.1},{"genre":"Thriller/Misteri","corak":"surealis_absurd","pct":7.6},{"genre":"Thriller/Misteri","corak":"pop_art","pct":1.8},{"genre":"Thriller/Misteri","corak":"kubisme","pct":0},{"genre":"Keluarga","corak":"kartunal","pct":29.9},{"genre":"Keluarga","corak":"minimalis","pct":33.5},{"genre":"Keluarga","corak":"ekspresionisme","pct":11.4},{"genre":"Keluarga","corak":"fotografi_kolase","pct":8.4},{"genre":"Keluarga","corak":"abstrak","pct":3.6},{"genre":"Keluarga","corak":"dekoratif","pct":5.4},{"genre":"Keluarga","corak":"realisme","pct":4.2},{"genre":"Keluarga","corak":"surealis_absurd","pct":1.8},{"genre":"Keluarga","corak":"pop_art","pct":1.2},{"genre":"Keluarga","corak":"kubisme","pct":0.6},{"genre":"Kontemporer","corak":"kartunal","pct":37.0},{"genre":"Kontemporer","corak":"minimalis","pct":23.7},{"genre":"Kontemporer","corak":"ekspresionisme","pct":14.8},{"genre":"Kontemporer","corak":"fotografi_kolase","pct":5.9},{"genre":"Kontemporer","corak":"abstrak","pct":5.9},{"genre":"Kontemporer","corak":"dekoratif","pct":5.2},{"genre":"Kontemporer","corak":"realisme","pct":2.2},{"genre":"Kontemporer","corak":"surealis_absurd","pct":3.0},{"genre":"Kontemporer","corak":"pop_art","pct":2.2},{"genre":"Kontemporer","corak":"kubisme","pct":0},{"genre":"Fiksi Sejarah","corak":"kartunal","pct":11.9},{"genre":"Fiksi Sejarah","corak":"minimalis","pct":23.0},{"genre":"Fiksi Sejarah","corak":"ekspresionisme","pct":23.7},{"genre":"Fiksi Sejarah","corak":"fotografi_kolase","pct":11.1},{"genre":"Fiksi Sejarah","corak":"abstrak","pct":5.2},{"genre":"Fiksi Sejarah","corak":"dekoratif","pct":14.1},{"genre":"Fiksi Sejarah","corak":"realisme","pct":5.2},{"genre":"Fiksi Sejarah","corak":"surealis_absurd","pct":4.4},{"genre":"Fiksi Sejarah","corak":"pop_art","pct":1.5},{"genre":"Fiksi Sejarah","corak":"kubisme","pct":0},{"genre":"Dewasa","corak":"kartunal","pct":25.4},{"genre":"Dewasa","corak":"minimalis","pct":29.1},{"genre":"Dewasa","corak":"ekspresionisme","pct":19.4},{"genre":"Dewasa","corak":"fotografi_kolase","pct":8.2},{"genre":"Dewasa","corak":"abstrak","pct":5.2},{"genre":"Dewasa","corak":"dekoratif","pct":6.0},{"genre":"Dewasa","corak":"realisme","pct":3.0},{"genre":"Dewasa","corak":"surealis_absurd","pct":1.5},{"genre":"Dewasa","corak":"pop_art","pct":2.2},{"genre":"Dewasa","corak":"kubisme","pct":0},{"genre":"Persahabatan","corak":"kartunal","pct":42.6},{"genre":"Persahabatan","corak":"minimalis","pct":28.7},{"genre":"Persahabatan","corak":"ekspresionisme","pct":7.8},{"genre":"Persahabatan","corak":"fotografi_kolase","pct":7.0},{"genre":"Persahabatan","corak":"abstrak","pct":2.3},{"genre":"Persahabatan","corak":"dekoratif","pct":3.9},{"genre":"Persahabatan","corak":"realisme","pct":4.7},{"genre":"Persahabatan","corak":"surealis_absurd","pct":0},{"genre":"Persahabatan","corak":"pop_art","pct":3.1},{"genre":"Persahabatan","corak":"kubisme","pct":0}],"tf_tren":[{"YEAR":2000,"typeface_kategori":"display","n":1,"total":35,"pct":2.86},{"YEAR":2000,"typeface_kategori":"humanist_serif","n":14,"total":35,"pct":40.0},{"YEAR":2000,"typeface_kategori":"modern_serif","n":13,"total":35,"pct":37.14},{"YEAR":2000,"typeface_kategori":"sans_serif","n":2,"total":35,"pct":5.71},{"YEAR":2000,"typeface_kategori":"script","n":4,"total":35,"pct":11.43},{"YEAR":2000,"typeface_kategori":"slab_serif","n":1,"total":35,"pct":2.86},{"YEAR":2001,"typeface_kategori":"humanist_serif","n":11,"total":35,"pct":31.43},{"YEAR":2001,"typeface_kategori":"modern_serif","n":11,"total":35,"pct":31.43},{"YEAR":2001,"typeface_kategori":"sans_serif","n":4,"total":35,"pct":11.43},{"YEAR":2001,"typeface_kategori":"script","n":8,"total":35,"pct":22.86},{"YEAR":2001,"typeface_kategori":"slab_serif","n":1,"total":35,"pct":2.86},{"YEAR":2002,"typeface_kategori":"humanist_serif","n":23,"total":58,"pct":39.66},{"YEAR":2002,"typeface_kategori":"modern_serif","n":20,"total":58,"pct":34.48},{"YEAR":2002,"typeface_kategori":"sans_serif","n":1,"total":58,"pct":1.72},{"YEAR":2002,"typeface_kategori":"script","n":10,"total":58,"pct":17.24},{"YEAR":2002,"typeface_kategori":"transitional_serif","n":4,"total":58,"pct":6.9},{"YEAR":2003,"typeface_kategori":"display","n":4,"total":62,"pct":6.45},{"YEAR":2003,"typeface_kategori":"humanist_serif","n":28,"total":62,"pct":45.16},{"YEAR":2003,"typeface_kategori":"modern_serif","n":21,"total":62,"pct":33.87},{"YEAR":2003,"typeface_kategori":"script","n":6,"total":62,"pct":9.68},{"YEAR":2003,"typeface_kategori":"slab_serif","n":1,"total":62,"pct":1.61},{"YEAR":2003,"typeface_kategori":"transitional_serif","n":2,"total":62,"pct":3.23},{"YEAR":2004,"typeface_kategori":"display","n":2,"total":72,"pct":2.78},{"YEAR":2004,"typeface_kategori":"humanist_serif","n":28,"total":72,"pct":38.89},{"YEAR":2004,"typeface_kategori":"modern_serif","n":25,"total":72,"pct":34.72},{"YEAR":2004,"typeface_kategori":"sans_serif","n":7,"total":72,"pct":9.72},{"YEAR":2004,"typeface_kategori":"script","n":4,"total":72,"pct":5.56},{"YEAR":2004,"typeface_kategori":"slab_serif","n":3,"total":72,"pct":4.17},{"YEAR":2004,"typeface_kategori":"transitional_serif","n":3,"total":72,"pct":4.17},{"YEAR":2005,"typeface_kategori":"display","n":10,"total":93,"pct":10.75},{"YEAR":2005,"typeface_kategori":"humanist_serif","n":25,"total":93,"pct":26.88},{"YEAR":2005,"typeface_kategori":"modern_serif","n":34,"total":93,"pct":36.56},{"YEAR":2005,"typeface_kategori":"sans_serif","n":14,"total":93,"pct":15.05},{"YEAR":2005,"typeface_kategori":"script","n":6,"total":93,"pct":6.45},{"YEAR":2005,"typeface_kategori":"slab_serif","n":1,"total":93,"pct":1.08},{"YEAR":2005,"typeface_kategori":"transitional_serif","n":3,"total":93,"pct":3.23},{"YEAR":2006,"typeface_kategori":"display","n":8,"total":67,"pct":11.94},{"YEAR":2006,"typeface_kategori":"humanist_serif","n":21,"total":67,"pct":31.34},{"YEAR":2006,"typeface_kategori":"modern_serif","n":16,"total":67,"pct":23.88},{"YEAR":2006,"typeface_kategori":"sans_serif","n":12,"total":67,"pct":17.91},{"YEAR":2006,"typeface_kategori":"script","n":9,"total":67,"pct":13.43},{"YEAR":2006,"typeface_kategori":"slab_serif","n":1,"total":67,"pct":1.49},{"YEAR":2007,"typeface_kategori":"display","n":6,"total":90,"pct":6.67},{"YEAR":2007,"typeface_kategori":"humanist_serif","n":25,"total":90,"pct":27.78},{"YEAR":2007,"typeface_kategori":"modern_serif","n":30,"total":90,"pct":33.33},{"YEAR":2007,"typeface_kategori":"sans_serif","n":12,"total":90,"pct":13.33},{"YEAR":2007,"typeface_kategori":"script","n":14,"total":90,"pct":15.56},{"YEAR":2007,"typeface_kategori":"slab_serif","n":1,"total":90,"pct":1.11},{"YEAR":2007,"typeface_kategori":"transitional_serif","n":2,"total":90,"pct":2.22},{"YEAR":2008,"typeface_kategori":"display","n":13,"total":93,"pct":13.98},{"YEAR":2008,"typeface_kategori":"humanist_serif","n":21,"total":93,"pct":22.58},{"YEAR":2008,"typeface_kategori":"modern_serif","n":28,"total":93,"pct":30.11},{"YEAR":2008,"typeface_kategori":"sans_serif","n":21,"total":93,"pct":22.58},{"YEAR":2008,"typeface_kategori":"script","n":7,"total":93,"pct":7.53},{"YEAR":2008,"typeface_kategori":"slab_serif","n":2,"total":93,"pct":2.15},{"YEAR":2008,"typeface_kategori":"transitional_serif","n":1,"total":93,"pct":1.08},{"YEAR":2009,"typeface_kategori":"display","n":11,"total":87,"pct":12.64},{"YEAR":2009,"typeface_kategori":"humanist_serif","n":18,"total":87,"pct":20.69},{"YEAR":2009,"typeface_kategori":"modern_serif","n":34,"total":87,"pct":39.08},{"YEAR":2009,"typeface_kategori":"sans_serif","n":14,"total":87,"pct":16.09},{"YEAR":2009,"typeface_kategori":"script","n":6,"total":87,"pct":6.9},{"YEAR":2009,"typeface_kategori":"slab_serif","n":1,"total":87,"pct":1.15},{"YEAR":2009,"typeface_kategori":"transitional_serif","n":3,"total":87,"pct":3.45},{"YEAR":2010,"typeface_kategori":"display","n":10,"total":88,"pct":11.36},{"YEAR":2010,"typeface_kategori":"humanist_serif","n":16,"total":88,"pct":18.18},{"YEAR":2010,"typeface_kategori":"modern_serif","n":37,"total":88,"pct":42.05},{"YEAR":2010,"typeface_kategori":"sans_serif","n":17,"total":88,"pct":19.32},{"YEAR":2010,"typeface_kategori":"script","n":5,"total":88,"pct":5.68},{"YEAR":2010,"typeface_kategori":"slab_serif","n":1,"total":88,"pct":1.14},{"YEAR":2010,"typeface_kategori":"transitional_serif","n":2,"total":88,"pct":2.27},{"YEAR":2011,"typeface_kategori":"display","n":11,"total":78,"pct":14.1},{"YEAR":2011,"typeface_kategori":"humanist_serif","n":11,"total":78,"pct":14.1},{"YEAR":2011,"typeface_kategori":"modern_serif","n":28,"total":78,"pct":35.9},{"YEAR":2011,"typeface_kategori":"sans_serif","n":15,"total":78,"pct":19.23},{"YEAR":2011,"typeface_kategori":"script","n":11,"total":78,"pct":14.1},{"YEAR":2011,"typeface_kategori":"transitional_serif","n":2,"total":78,"pct":2.56},{"YEAR":2012,"typeface_kategori":"display","n":20,"total":137,"pct":14.6},{"YEAR":2012,"typeface_kategori":"humanist_serif","n":28,"total":137,"pct":20.44},{"YEAR":2012,"typeface_kategori":"modern_serif","n":37,"total":137,"pct":27.01},{"YEAR":2012,"typeface_kategori":"sans_serif","n":35,"total":137,"pct":25.55},{"YEAR":2012,"typeface_kategori":"script","n":14,"total":137,"pct":10.22},{"YEAR":2012,"typeface_kategori":"slab_serif","n":2,"total":137,"pct":1.46},{"YEAR":2012,"typeface_kategori":"transitional_serif","n":1,"total":137,"pct":0.73},{"YEAR":2013,"typeface_kategori":"display","n":18,"total":144,"pct":12.5},{"YEAR":2013,"typeface_kategori":"humanist_serif","n":22,"total":144,"pct":15.28},{"YEAR":2013,"typeface_kategori":"modern_serif","n":53,"total":144,"pct":36.81},{"YEAR":2013,"typeface_kategori":"sans_serif","n":30,"total":144,"pct":20.83},{"YEAR":2013,"typeface_kategori":"script","n":19,"total":144,"pct":13.19},{"YEAR":2013,"typeface_kategori":"slab_serif","n":2,"total":144,"pct":1.39},{"YEAR":2014,"typeface_kategori":"display","n":25,"total":205,"pct":12.2},{"YEAR":2014,"typeface_kategori":"humanist_serif","n":31,"total":205,"pct":15.12},{"YEAR":2014,"typeface_kategori":"modern_serif","n":65,"total":205,"pct":31.71},{"YEAR":2014,"typeface_kategori":"sans_serif","n":41,"total":205,"pct":20.0},{"YEAR":2014,"typeface_kategori":"script","n":36,"total":205,"pct":17.56},{"YEAR":2014,"typeface_kategori":"slab_serif","n":4,"total":205,"pct":1.95},{"YEAR":2014,"typeface_kategori":"transitional_serif","n":3,"total":205,"pct":1.46},{"YEAR":2015,"typeface_kategori":"display","n":39,"total":217,"pct":17.97},{"YEAR":2015,"typeface_kategori":"humanist_serif","n":24,"total":217,"pct":11.06},{"YEAR":2015,"typeface_kategori":"modern_serif","n":65,"total":217,"pct":29.95},{"YEAR":2015,"typeface_kategori":"sans_serif","n":56,"total":217,"pct":25.81},{"YEAR":2015,"typeface_kategori":"script","n":26,"total":217,"pct":11.98},{"YEAR":2015,"typeface_kategori":"slab_serif","n":3,"total":217,"pct":1.38},{"YEAR":2015,"typeface_kategori":"transitional_serif","n":4,"total":217,"pct":1.84},{"YEAR":2016,"typeface_kategori":"display","n":14,"total":186,"pct":7.53},{"YEAR":2016,"typeface_kategori":"humanist_serif","n":29,"total":186,"pct":15.59},{"YEAR":2016,"typeface_kategori":"modern_serif","n":46,"total":186,"pct":24.73},{"YEAR":2016,"typeface_kategori":"sans_serif","n":63,"total":186,"pct":33.87},{"YEAR":2016,"typeface_kategori":"script","n":31,"total":186,"pct":16.67},{"YEAR":2016,"typeface_kategori":"slab_serif","n":2,"total":186,"pct":1.08},{"YEAR":2016,"typeface_kategori":"transitional_serif","n":1,"total":186,"pct":0.54},{"YEAR":2017,"typeface_kategori":"display","n":30,"total":237,"pct":12.66},{"YEAR":2017,"typeface_kategori":"humanist_serif","n":30,"total":237,"pct":12.66},{"YEAR":2017,"typeface_kategori":"modern_serif","n":62,"total":237,"pct":26.16},{"YEAR":2017,"typeface_kategori":"sans_serif","n":63,"total":237,"pct":26.58},{"YEAR":2017,"typeface_kategori":"script","n":40,"total":237,"pct":16.88},{"YEAR":2017,"typeface_kategori":"slab_serif","n":6,"total":237,"pct":2.53},{"YEAR":2017,"typeface_kategori":"transitional_serif","n":6,"total":237,"pct":2.53},{"YEAR":2018,"typeface_kategori":"display","n":10,"total":156,"pct":6.41},{"YEAR":2018,"typeface_kategori":"humanist_serif","n":25,"total":156,"pct":16.03},{"YEAR":2018,"typeface_kategori":"modern_serif","n":35,"total":156,"pct":22.44},{"YEAR":2018,"typeface_kategori":"sans_serif","n":48,"total":156,"pct":30.77},{"YEAR":2018,"typeface_kategori":"script","n":29,"total":156,"pct":18.59},{"YEAR":2018,"typeface_kategori":"slab_serif","n":9,"total":156,"pct":5.77},{"YEAR":2019,"typeface_kategori":"display","n":5,"total":147,"pct":3.4},{"YEAR":2019,"typeface_kategori":"humanist_serif","n":19,"total":147,"pct":12.93},{"YEAR":2019,"typeface_kategori":"modern_serif","n":45,"total":147,"pct":30.61},{"YEAR":2019,"typeface_kategori":"sans_serif","n":52,"total":147,"pct":35.37},{"YEAR":2019,"typeface_kategori":"script","n":18,"total":147,"pct":12.24},{"YEAR":2019,"typeface_kategori":"slab_serif","n":3,"total":147,"pct":2.04},{"YEAR":2019,"typeface_kategori":"transitional_serif","n":5,"total":147,"pct":3.4},{"YEAR":2020,"typeface_kategori":"display","n":9,"total":103,"pct":8.74},{"YEAR":2020,"typeface_kategori":"humanist_serif","n":18,"total":103,"pct":17.48},{"YEAR":2020,"typeface_kategori":"modern_serif","n":23,"total":103,"pct":22.33},{"YEAR":2020,"typeface_kategori":"sans_serif","n":34,"total":103,"pct":33.01},{"YEAR":2020,"typeface_kategori":"script","n":16,"total":103,"pct":15.53},{"YEAR":2020,"typeface_kategori":"slab_serif","n":1,"total":103,"pct":0.97},{"YEAR":2020,"typeface_kategori":"transitional_serif","n":2,"total":103,"pct":1.94},{"YEAR":2021,"typeface_kategori":"display","n":5,"total":50,"pct":10.0},{"YEAR":2021,"typeface_kategori":"humanist_serif","n":5,"total":50,"pct":10.0},{"YEAR":2021,"typeface_kategori":"modern_serif","n":12,"total":50,"pct":24.0},{"YEAR":2021,"typeface_kategori":"sans_serif","n":17,"total":50,"pct":34.0},{"YEAR":2021,"typeface_kategori":"script","n":7,"total":50,"pct":14.0},{"YEAR":2021,"typeface_kategori":"slab_serif","n":3,"total":50,"pct":6.0},{"YEAR":2021,"typeface_kategori":"transitional_serif","n":1,"total":50,"pct":2.0},{"YEAR":2022,"typeface_kategori":"display","n":2,"total":39,"pct":5.13},{"YEAR":2022,"typeface_kategori":"humanist_serif","n":3,"total":39,"pct":7.69},{"YEAR":2022,"typeface_kategori":"modern_serif","n":4,"total":39,"pct":10.26},{"YEAR":2022,"typeface_kategori":"sans_serif","n":20,"total":39,"pct":51.28},{"YEAR":2022,"typeface_kategori":"script","n":8,"total":39,"pct":20.51},{"YEAR":2022,"typeface_kategori":"transitional_serif","n":2,"total":39,"pct":5.13},{"YEAR":2023,"typeface_kategori":"display","n":2,"total":44,"pct":4.55},{"YEAR":2023,"typeface_kategori":"humanist_serif","n":5,"total":44,"pct":11.36},{"YEAR":2023,"typeface_kategori":"modern_serif","n":12,"total":44,"pct":27.27},{"YEAR":2023,"typeface_kategori":"sans_serif","n":13,"total":44,"pct":29.55},{"YEAR":2023,"typeface_kategori":"script","n":7,"total":44,"pct":15.91},{"YEAR":2023,"typeface_kategori":"slab_serif","n":2,"total":44,"pct":4.55},{"YEAR":2023,"typeface_kategori":"transitional_serif","n":3,"total":44,"pct":6.82},{"YEAR":2024,"typeface_kategori":"display","n":2,"total":49,"pct":4.08},{"YEAR":2024,"typeface_kategori":"humanist_serif","n":10,"total":49,"pct":20.41},{"YEAR":2024,"typeface_kategori":"modern_serif","n":15,"total":49,"pct":30.61},{"YEAR":2024,"typeface_kategori":"sans_serif","n":12,"total":49,"pct":24.49},{"YEAR":2024,"typeface_kategori":"script","n":2,"total":49,"pct":4.08},{"YEAR":2024,"typeface_kategori":"slab_serif","n":4,"total":49,"pct":8.16},{"YEAR":2024,"typeface_kategori":"transitional_serif","n":4,"total":49,"pct":8.16},{"YEAR":2025,"typeface_kategori":"humanist_serif","n":5,"total":15,"pct":33.33},{"YEAR":2025,"typeface_kategori":"modern_serif","n":3,"total":15,"pct":20.0},{"YEAR":2025,"typeface_kategori":"sans_serif","n":6,"total":15,"pct":40.0},{"YEAR":2025,"typeface_kategori":"script","n":1,"total":15,"pct":6.67}],"top_genres":["Romansa","Novel","Puisi","Remaja","Cerita Pendek","Fantasi","Drama","Chick Lit","Thriller/Misteri","Keluarga","Kontemporer","Fiksi Sejarah","Dewasa","Persahabatan"],"corak_order":["kartunal","minimalis","ekspresionisme","fotografi_kolase","abstrak","dekoratif","realisme","surealis_absurd","pop_art","kubisme"],"warna_hex":{"putih":"#F5F5F0","hitam":"#1A1A1A","abu":"#8E8E93","merah":"#E53935","pink":"#F06292","oranye":"#FB8C00","cokelat":"#795548","kuning":"#FDD835","hijau":"#43A047","biru":"#1E88E5","ungu":"#8E24AA"}};
+
+// ── CONFIG ────────────────────────────────────────────────────────────────
+const CORAK_ID = {kartunal:"Kartunal",minimalis:"Minimalis",ekspresionisme:"Ekspresionisme",fotografi_kolase:"Foto/Kolase",abstrak:"Abstrak",dekoratif:"Dekoratif",realisme:"Realisme",surealis_absurd:"Surealis",pop_art:"Pop Art",kubisme:"Kubisme"};
+const CORAK_CLR = {kartunal:"#FB8C00",minimalis:"#757575",ekspresionisme:"#E53935",fotografi_kolase:"#3949AB",abstrak:"#00ACC1",dekoratif:"#43A047",realisme:"#1E88E5",surealis_absurd:"#8E24AA",pop_art:"#FDD835",kubisme:"#6D4C41"};
+const TF_ID = {humanist_serif:"Humanist Serif",transitional_serif:"Transitional Serif",modern_serif:"Modern Serif",slab_serif:"Slab Serif",sans_serif:"Sans-serif",script:"Kaligrafi/Script",display:"Display/Dekoratif"};
+const TF_CLR = {humanist_serif:"#5C6BC0",transitional_serif:"#7E57C2",modern_serif:"#AB47BC",slab_serif:"#EC407A",sans_serif:"#42A5F5",script:"#26A69A",display:"#FFA726"};
+const WARNA_HEX = DATA.warna_hex;
+const YEARS = Array.from({length:26},(_,i)=>2000+i);
+
+const CHART_DEFAULTS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  animation: { duration: 600 }
+};
+
+function ink(a=1){ return `rgba(26,20,16,${a})`; }
+function paper2(){ return '#f3ede3'; }
+
+// ── SCROLL PROGRESS ───────────────────────────────────────────────────────
+window.addEventListener('scroll', () => {
+  const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
+  document.getElementById('scroll-line').style.width = Math.min(pct,100) + '%';
+});
+
+// ── ACTIVE NAV ─────────────────────────────────────────────────────────────
+const sections = document.querySelectorAll('section');
+const navLinks = document.querySelectorAll('nav a');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if(e.isIntersecting){
+      navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#'+e.target.id));
+    }
+  });
+}, { threshold: 0.35 });
+sections.forEach(s => observer.observe(s));
+
+// ── HELPER: group data ────────────────────────────────────────────────────
+function byYear(arr, keyFn, valFn) {
+  const out = {};
+  arr.forEach(r => {
+    const y = r.YEAR || r.tahun;
+    if(!out[y]) out[y] = {};
+    out[y][keyFn(r)] = valFn(r);
+  });
+  return out;
+}
+
+function stackedDatasets(grouped, keys, clrFn, labelFn) {
+  return keys.map(k => ({
+    label: labelFn(k),
+    data: YEARS.map(y => grouped[y] ? (grouped[y][k] || 0) : 0),
+    backgroundColor: clrFn(k),
+    borderWidth: 0,
+    stack: 'stack',
+  }));
+}
+
+// ── CHART: TERBIT ─────────────────────────────────────────────────────────
+{
+  const totals = {};
+  DATA.tren_corak.forEach(r => { if(!totals[r.YEAR]) totals[r.YEAR]=r.total; });
+  new Chart(document.getElementById('chartTerbit'), {
+    type: 'bar',
+    data: {
+      labels: YEARS,
+      datasets: [{ data: YEARS.map(y=>totals[y]||0), backgroundColor: '#8b2e12', borderWidth:0 }]
+    },
+    options: { ...CHART_DEFAULTS,
+      scales: { x:{ ticks:{color:ink(.55),font:{size:10}}, grid:{display:false} },
+                y:{ ticks:{color:ink(.55),font:{size:10}}, grid:{color:'rgba(139,46,18,.08)'} } }
+    }
+  });
+}
+
+// ── CHART: CORAK DIST ────────────────────────────────────────────────────
+{
+  const totals = {};
+  DATA.tren_corak.forEach(r => { totals[r.corak_norm] = (totals[r.corak_norm]||0)+r.n; });
+  const keys = DATA.corak_order.filter(k=>totals[k]);
+  const vals = keys.map(k=>totals[k]);
+  const labels = keys.map(k=>CORAK_ID[k]||k);
+  new Chart(document.getElementById('chartCorakDist'), {
+    type: 'bar',
+    data: { labels, datasets:[{ data:vals, backgroundColor:keys.map(k=>CORAK_CLR[k]), borderWidth:0 }] },
+    options: { ...CHART_DEFAULTS, indexAxis:'y',
+      scales: { x:{ticks:{color:ink(.55),font:{size:10}},grid:{color:'rgba(139,46,18,.08)'}},
+                y:{ticks:{color:ink(.7),font:{size:11}},grid:{display:false}} }
+    }
+  });
+}
+
+// ── CHART: CORAK TREN ────────────────────────────────────────────────────
+let corakTrenChart, corakMode = 'proporsi';
+function buildCorakTren(mode) {
+  const grouped = byYear(DATA.tren_corak, r=>r.corak_norm, r=>mode==='proporsi'?r.pct:r.n);
+  const datasets = stackedDatasets(grouped, DATA.corak_order, k=>CORAK_CLR[k], k=>CORAK_ID[k]||k);
+  if(corakTrenChart) { corakTrenChart.data.datasets=datasets; corakTrenChart.update(); return; }
+  const legendEl = document.getElementById('legend-corak');
+  DATA.corak_order.forEach(k => {
+    legendEl.innerHTML += `<span class="legend-item"><span class="legend-dot" style="background:${CORAK_CLR[k]}"></span>${CORAK_ID[k]||k}</span>`;
+  });
+  corakTrenChart = new Chart(document.getElementById('chartCorakTren'), {
+    type:'bar',
+    data:{ labels:YEARS, datasets },
+    options:{ ...CHART_DEFAULTS,
+      scales:{ x:{stacked:true,ticks:{color:ink(.55),font:{size:10}},grid:{display:false}},
+               y:{stacked:true,ticks:{color:ink(.55),font:{size:10}},grid:{color:'rgba(139,46,18,.08)'},
+                  title:{display:true,text:mode==='proporsi'?'%':'Jumlah',color:ink(.4),font:{size:10}}} }
+    }
+  });
+}
+buildCorakTren('proporsi');
+document.getElementById('tren-tabs').addEventListener('click', e => {
+  if(!e.target.dataset.mode) return;
+  corakMode = e.target.dataset.mode;
+  document.querySelectorAll('#tren-tabs .tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===corakMode));
+  buildCorakTren(corakMode);
+});
+
+// ── CHART: WARNA DIST ────────────────────────────────────────────────────
+{
+  const agg = {};
+  DATA.warna_tren.forEach(r => { agg[r.warna]=(agg[r.warna]||0)+r.pct; });
+  const keys = Object.keys(WARNA_HEX).filter(k=>agg[k]>0);
+  const vals = keys.map(k=>+(agg[k]/26).toFixed(1));
+  new Chart(document.getElementById('chartWarnaDist'), {
+    type:'doughnut',
+    data:{ labels:keys, datasets:[{ data:vals, backgroundColor:keys.map(k=>WARNA_HEX[k]), borderWidth:1.5, borderColor:'#faf7f2' }] },
+    options:{ ...CHART_DEFAULTS,
+      plugins:{ legend:{ display:true, position:'right',
+        labels:{ color:ink(.7), font:{size:10}, boxWidth:10, padding:10 }}}
+    }
+  });
+
+  // warna bars (rata-rata)
+  const container = document.getElementById('warnaBars');
+  const maxVal = Math.max(...vals);
+  keys.forEach((k,i)=>{
+    const pct = vals[i];
+    container.innerHTML += `
+      <div class="bar-row">
+        <span class="bar-label">${k}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${(pct/maxVal*100).toFixed(1)}%;background:${WARNA_HEX[k]};border:1px solid rgba(0,0,0,.12)"></div></div>
+        <span class="bar-val">${pct.toFixed(1)}%</span>
+      </div>`;
+  });
+}
+
+// ── CHART: WARNA TREN (line, interactive) ─────────────────────────────────
+let warnaTrenChart, currentWarna = 'putih';
+function buildWarnaTren(warna) {
+  const data = YEARS.map(y => {
+    const r = DATA.warna_tren.find(d=>d.tahun===y && d.warna===warna);
+    return r ? r.pct : null;
+  });
+  if(warnaTrenChart) {
+    warnaTrenChart.data.datasets[0].data = data;
+    warnaTrenChart.data.datasets[0].borderColor = WARNA_HEX[warna];
+    warnaTrenChart.data.datasets[0].backgroundColor = WARNA_HEX[warna]+'30';
+    warnaTrenChart.data.datasets[0].label = warna;
+    warnaTrenChart.update(); return;
+  }
+  warnaTrenChart = new Chart(document.getElementById('chartWarnaTren'), {
+    type:'line',
+    data:{ labels:YEARS, datasets:[{ label:warna, data, borderColor:WARNA_HEX[warna],
+      backgroundColor:WARNA_HEX[warna]+'30', fill:true, tension:0.35,
+      pointRadius:3, pointHoverRadius:5, borderWidth:2 }] },
+    options:{ ...CHART_DEFAULTS,
+      scales:{ x:{ticks:{color:ink(.55),font:{size:10}},grid:{display:false}},
+               y:{ticks:{color:ink(.55),font:{size:10}},grid:{color:'rgba(139,46,18,.08)'},
+                  title:{display:true,text:'% dari bobot warna',color:ink(.4),font:{size:10}}} },
+      plugins:{ tooltip:{ callbacks:{ label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%` }}}
+    }
+  });
+}
+buildWarnaTren('putih');
+document.getElementById('warna-tabs').addEventListener('click', e => {
+  if(!e.target.dataset.warna) return;
+  currentWarna = e.target.dataset.warna;
+  document.querySelectorAll('#warna-tabs .tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.warna===currentWarna));
+  buildWarnaTren(currentWarna);
+});
+
+// ── CHART: TIPOGRAFI DIST ─────────────────────────────────────────────────
+{
+  const totals = {};
+  DATA.tf_tren.forEach(r=>{ totals[r.typeface_kategori]=(totals[r.typeface_kategori]||0)+r.n; });
+  const keys = Object.keys(TF_ID);
+  const vals = keys.map(k=>totals[k]||0);
+  new Chart(document.getElementById('chartTfDist'), {
+    type:'bar',
+    data:{ labels:keys.map(k=>TF_ID[k]), datasets:[{ data:vals, backgroundColor:keys.map(k=>TF_CLR[k]), borderWidth:0 }] },
+    options:{ ...CHART_DEFAULTS, indexAxis:'y',
+      scales:{ x:{ticks:{color:ink(.55),font:{size:10}},grid:{color:'rgba(139,46,18,.08)'}},
+               y:{ticks:{color:ink(.7),font:{size:11}},grid:{display:false}} }
+    }
+  });
+}
+
+// ── CHART: TIPOGRAFI TREN ─────────────────────────────────────────────────
+{
+  const grouped = byYear(DATA.tf_tren, r=>r.typeface_kategori, r=>r.pct);
+  const keys = Object.keys(TF_ID);
+  const datasets = stackedDatasets(grouped, keys, k=>TF_CLR[k], k=>TF_ID[k]||k);
+  const legendEl = document.getElementById('legend-tf');
+  keys.forEach(k => {
+    legendEl.innerHTML += `<span class="legend-item"><span class="legend-dot" style="background:${TF_CLR[k]}"></span>${TF_ID[k]}</span>`;
+  });
+  new Chart(document.getElementById('chartTfTren'), {
+    type:'bar',
+    data:{ labels:YEARS, datasets },
+    options:{ ...CHART_DEFAULTS,
+      scales:{ x:{stacked:true,ticks:{color:ink(.55),font:{size:10}},grid:{display:false}},
+               y:{stacked:true,ticks:{color:ink(.55),font:{size:10}},grid:{color:'rgba(139,46,18,.08)'},
+                  title:{display:true,text:'%',color:ink(.4),font:{size:10}}} }
+    }
+  });
+}
+
+// ── HEATMAP ───────────────────────────────────────────────────────────────
+{
+  const genres = DATA.top_genres;
+  const coraks = DATA.corak_order;
+  const head = document.getElementById('heatmapHead');
+  head.innerHTML = `<th class="genre-head">Genre</th>` +
+    coraks.map(c=>`<th>${CORAK_ID[c]||c}</th>`).join('');
+
+  const body = document.getElementById('heatmapBody');
+  genres.forEach(g => {
+    const row = document.createElement('tr');
+    row.innerHTML = `<td class="genre-cell">${g}</td>`;
+    coraks.forEach(c => {
+      const rec = DATA.heatmap.find(d=>d.genre===g&&d.corak===c);
+      const val = rec ? rec.pct : 0;
+      const alpha = Math.min(val/45, 1);
+      const bg = `rgba(139,46,18,${(alpha*0.75).toFixed(2)})`;
+      const txtColor = alpha > 0.5 ? '#faf7f2' : '#3d3530';
+      row.innerHTML += `<td style="background:${bg};color:${txtColor}">${val>0?val.toFixed(0)+'%':'·'}</td>`;
+    });
+    body.appendChild(row);
+  });
+}
+</script>
+</body>
+</html>
