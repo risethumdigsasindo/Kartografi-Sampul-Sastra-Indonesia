@@ -298,7 +298,7 @@ main { min-height: calc(100vh - 52px); }
   <!-- ══ BERANDA ═══════════════════════════════════════════════════════════ -->
   <section id="page-beranda" class="page active">
     <h1 class="page-title">Kartografi Sampul Sastra Indonesia</h1>
-    <p class="page-sub">Pemetaan komputasional terhadap 5.068 sampul buku fiksi dan puisi Indonesia, 2000&ndash;2025.</p>
+    <p class="page-sub">Pemetaan komputasional terhadap 5.068 sampul buku sastra Indonesia periode 2000&ndash;2025.</p>
 
     <div class="nav-cards">
       <div class="nav-card" onclick="navigateTo('warna')">
@@ -353,7 +353,7 @@ main { min-height: calc(100vh - 52px); }
 
     <div class="grid-2">
       <div class="chart-card">
-        <h3>Tren Terbit per Tahun</h3>
+        <h3>Jumlah Buku per Tahun</h3>
         <div class="chart-wrap" style="height:220px"><canvas id="chart-trend-year"></canvas></div>
       </div>
       <div class="chart-card">
@@ -379,7 +379,7 @@ main { min-height: calc(100vh - 52px); }
   <!-- ══ WARNA ══════════════════════════════════════════════════════════════ -->
   <section id="page-warna" class="page">
     <h1 class="page-title">Analisis Warna</h1>
-    <p class="page-sub">Distribusi warna berbasis K-Means HSV pada 5 klaster warna per sampul, tertimbang berdasarkan persentase piksel.</p>
+    <p class="page-sub">Distribusi warna berbasis K-Means HSV pada 5 klaster warna per sampul</p>
 
     <div class="grid-2">
       <div class="chart-card">
@@ -490,7 +490,6 @@ main { min-height: calc(100vh - 52px); }
     <hr class="divider">
     <div class="section-hd">
       <h3>Analisis Overlap Genre per Klaster</h3>
-      <p>Berapa banyak buku berbagi lebih dari satu tag genre sekaligus — menunjukkan gravitasi tematik antar genre</p>
     </div>
 
     <div class="tabs" id="overlap-tabs">
@@ -502,7 +501,6 @@ main { min-height: calc(100vh - 52px); }
     <!-- K1 Overlap -->
     <div class="tab-panel active" id="overlap-k1">
       <div class="note-box" style="margin-bottom:16px">
-      </div>
       <div style="overflow-x:auto">
         <table class="overlap-table">
           <thead><tr><th>Genre 1</th><th>Genre 2</th><th>N Genre 1</th><th>N Genre 2</th><th>Overlap</th><th>Overlap %</th></tr></thead>
@@ -518,7 +516,6 @@ main { min-height: calc(100vh - 52px); }
     <!-- K2 Overlap -->
     <div class="tab-panel" id="overlap-k2">
       <div class="note-box" style="margin-bottom:16px">
-      </div>
       <div style="overflow-x:auto">
         <table class="overlap-table">
           <thead><tr><th>Genre 1</th><th>Genre 2</th><th>N Genre 1</th><th>N Genre 2</th><th>Overlap</th><th>Overlap %</th></tr></thead>
@@ -539,7 +536,6 @@ main { min-height: calc(100vh - 52px); }
     <!-- K3 Overlap -->
     <div class="tab-panel" id="overlap-k3">
       <div class="note-box" style="margin-bottom:16px">
-      </div>
       <div style="overflow-x:auto">
         <table class="overlap-table">
           <thead><tr><th>Genre 1</th><th>Genre 2</th><th>N Genre 1</th><th>N Genre 2</th><th>Overlap</th><th>Overlap %</th></tr></thead>
