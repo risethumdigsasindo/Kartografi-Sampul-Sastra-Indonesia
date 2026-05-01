@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kartografi Sampul Sastra Indonesia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --navy:   #2E4057;
+    --teal:   #1D9E75;
+    --rose:   #993556;
+    --serif-c:#3949AB;
+    --script-c:#00897B;
+    --sans-c: #1565C0;
+    --fancy-c:#E65100;
+    --bg:     #F8F9FA;
+    --card:   #FFFFFF;
+    --border: #E5E9EF;
+    --text:   #1A1A2E;
+    --muted:  #6B7280;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── NAV ─────────────────────────────────────────────────── */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255,255,255,.97);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 52px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-inner::-webkit-scrollbar { display: none; }
+  .nav-brand {
+    font-family: Georgia, serif;
+    font-weight: 700;
+    font-size: .88rem;
+    color: var(--navy);
+    white-space: nowrap;
+    margin-right: 12px;
+  }
+  .nav-link {
+    display: inline-block;
+    padding: 6px 13px;
+    border-radius: 20px;
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all .15s;
+  }
+  .nav-link:hover, .nav-link.active {
+    background: var(--navy);
+    color: #fff;
+  }
+
+  /* ── LAYOUT ──────────────────────────────────────────────── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+
+  section { padding: 40px 0; }
+  section + section { border-top: 1px solid var(--border); }
+
+  .section-title {
+    font-family: Georgia, serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+  }
+  .section-sub {
+    font-size: .82rem;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+
+  @media (max-width: 700px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .grid-2-3 { grid-template-columns: 1fr; }
+  }
+  @media (min-width: 701px) and (max-width: 900px) {
+    .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── CARDS ───────────────────────────────────────────────── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .card-title {
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .card-value {
+    font-size: 2rem;
+    font-weight: 700;
+    font-family: Georgia, serif;
+    line-height: 1.1;
+  }
+  .card-note { font-size: .72rem; color: var(--muted); margin-top: 3px; }
+
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(4,1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 700px) {
+    .stat-strip { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── CHART WRAPPER ───────────────────────────────────────── */
+  .chart-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .chart-wrap h3 {
+    font-family: Georgia, serif;
+    font-size: .95rem;
+    color: var(--navy);
+    margin-bottom: 14px;
+  }
+  canvas { max-height: 300px; }
+
+  /* ── HERO ────────────────────────────────────────────────── */
+  #beranda {
+    background: linear-gradient(135deg, #1a2744 0%, #2E4057 60%, #1D4E3A 100%);
+    color: #fff;
+    padding: 56px 0 40px;
+  }
+  #beranda .section-title { color: #fff; font-size: 1.8rem; }
+  #beranda .section-sub { color: rgba(255,255,255,.7); font-size: .9rem; }
+
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4,1fr);
+    gap: 14px;
+    margin-top: 28px;
+  }
+  @media (max-width: 700px) {
+    .hero-stats { grid-template-columns: 1fr 1fr; }
+    #beranda .section-title { font-size: 1.3rem; }
+  }
+  .hero-stat {
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .hero-stat .label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; opacity: .65; }
+  .hero-stat .value { font-size: 1.7rem; font-weight: 700; font-family: Georgia, serif; line-height: 1.1; }
+  .hero-stat .note  { font-size: .65rem; opacity: .55; margin-top: 2px; }
+
+  /* ── TYPEFACE CARDS ──────────────────────────────────────── */
+  .tf-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+  .tf-sample {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .tf-name { font-size: .78rem; font-weight: 700; margin-bottom: 6px; }
+  .tf-desc { font-size: .65rem; color: var(--muted); line-height: 1.4; text-align: left; }
+
+  /* ── HEATMAP TABLE ───────────────────────────────────────── */
+  .heatmap-wrap { overflow-x: auto; }
+  table.heatmap {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .78rem;
+  }
+  table.heatmap th {
+    background: var(--navy);
+    color: #fff;
+    padding: 7px 12px;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  table.heatmap th.genre-col { text-align: left; min-width: 160px; }
+  table.heatmap td {
+    padding: 6px 12px;
+    border: 1px solid #eee;
+    text-align: center;
+  }
+  table.heatmap td.genre-name {
+    text-align: left;
+    font-weight: 500;
+    white-space: nowrap;
+    background: #fafafa;
+  }
+  table.heatmap .klaster-sep td {
+    background: #f0f4f8;
+    font-size: .7rem;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+  }
+  table.heatmap .klaster-sep td:first-child { text-align: left; }
+
+  /* ── GENRE SECTION ───────────────────────────────────────── */
+  .klaster-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: .7rem;
+    font-weight: 700;
+    color: #fff;
+    margin-right: 6px;
+  }
+
+  /* ── OVERLAP TABLE ───────────────────────────────────────── */
+  table.overlap {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .78rem;
+  }
+  table.overlap th {
+    background: #37474F;
+    color: #fff;
+    padding: 7px 12px;
+    text-align: left;
+  }
+  table.overlap td {
+    padding: 6px 12px;
+    border: 1px solid #eee;
+  }
+  table.overlap tr:nth-child(even) td { background: #fafafa; }
+
+  /* ── BROWSE ──────────────────────────────────────────────── */
+  .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .filter-bar select, .filter-bar input {
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: .8rem;
+    background: var(--card);
+    color: var(--text);
+    outline: none;
+  }
+  .filter-bar input { flex: 1; min-width: 160px; }
+
+  .book-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 12px;
+  }
+  .book-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .book-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,.1); }
+  .book-cover {
+    width: 100%;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+    background: #e0e0e0;
+    display: block;
+  }
+  .book-info { padding: 8px; }
+  .book-title { font-size: .68rem; font-weight: 600; line-height: 1.3; margin-bottom: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .book-meta { font-size: .6rem; color: var(--muted); }
+
+  .load-more {
+    display: block;
+    margin: 24px auto 0;
+    padding: 10px 32px;
+    border: 2px solid var(--navy);
+    border-radius: 20px;
+    background: transparent;
+    color: var(--navy);
+    font-weight: 600;
+    font-size: .85rem;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .load-more:hover { background: var(--navy); color: #fff; }
+
+  /* ── MODAL ───────────────────────────────────────────────── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border-radius: 12px;
+    max-width: 560px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 24px;
+    position: relative;
+  }
+  .modal-close {
+    position: absolute;
+    top: 12px; right: 14px;
+    font-size: 1.3rem;
+    cursor: pointer;
+    color: var(--muted);
+    border: none;
+    background: none;
+  }
+  .modal img { width: 100%; max-height: 280px; object-fit: contain; border-radius: 6px; margin-bottom: 14px; }
+
+  /* ── LOADING ─────────────────────────────────────────────── */
+  #loading {
+    position: fixed; inset: 0;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    gap: 16px;
+    transition: opacity .4s;
+  }
+  .spinner {
+    width: 42px; height: 42px;
+    border: 4px solid #e0e0e0;
+    border-top-color: var(--navy);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── MISC ────────────────────────────────────────────────── */
+  .pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 12px;
+    font-size: .65rem;
+    font-weight: 600;
+  }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  .note-box {
+    background: #F0F4FF;
+    border-left: 4px solid var(--navy);
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    font-size: .8rem;
+    line-height: 1.55;
+    color: #333;
+    margin-top: 14px;
+  }
+
+  footer {
+    background: var(--navy);
+    color: rgba(255,255,255,.6);
+    text-align: center;
+    padding: 24px;
+    font-size: .75rem;
+  }
+  footer strong { color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="font-family:Georgia,serif;font-weight:700;color:#2E4057;font-size:1.1rem;">Kartografi Sampul Sastra Indonesia</div>
+  <div style="font-size:.8rem;color:#888;">Memuat data 5.069 sampul…</div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <span class="nav-brand">Kartografi Sampul</span>
+    <a href="#beranda" class="nav-link active">Beranda</a>
+    <a href="#warna" class="nav-link">Warna</a>
+    <a href="#tipografi" class="nav-link">Tipografi</a>
+    <a href="#ilustrasi" class="nav-link">Corak Ilustrasi</a>
+    <a href="#genre" class="nav-link">Genre</a>
+    <a href="#jelajah" class="nav-link">Jelajah Buku</a>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════
+     BERANDA
+═══════════════════════════════════════════════════════════ -->
+<section id="beranda">
+  <div class="container">
+    <div class="section-title">Kartografi Sampul Sastra Indonesia</div>
+    <div class="section-sub">Pemetaan komputasional terhadap 5.069 sampul buku fiksi dan puisi Indonesia, 2000–2025.<br>
+    <small style="opacity:.6;">Metode: K-Means HSV · CLIP zero-shot · EasyOCR · YOLOv8n · Riset: Warna Wajah Sastra Indonesia · DKJ 2025</small></div>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="label">Total Buku</div>
+        <div class="value">5.069</div>
+        <div class="note">fiksi & puisi Indonesia</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Terklasifikasi Tipografi</div>
+        <div class="value">5.069</div>
+        <div class="note">Serif · Script · Sans-serif · Fancy</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Corak Ilustrasi</div>
+        <div class="value">5.069</div>
+        <div class="note">10 kategori CLIP</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Rentang Waktu</div>
+        <div class="value">25</div>
+        <div class="note">tahun (2000–2025)</div>
+      </div>
+    </div>
+
+    <div style="margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div class="chart-wrap" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);">
+        <h3 style="color:rgba(255,255,255,.85);">Tren Terbit per Tahun</h3>
+        <canvas id="chartTren"></canvas>
+      </div>
+      <div class="chart-wrap" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);">
+        <h3 style="color:rgba(255,255,255,.85);">Distribusi Corak Ilustrasi</h3>
+        <canvas id="chartCorakBeranda"></canvas>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div class="chart-wrap" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);">
+        <h3 style="color:rgba(255,255,255,.85);">Komposisi Warna Dominan</h3>
+        <canvas id="chartWarnaBeranda"></canvas>
+      </div>
+      <div class="chart-wrap" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);">
+        <h3 style="color:rgba(255,255,255,.85);">Tipografi (4 Kategori)</h3>
+        <canvas id="chartTfBeranda"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     WARNA
+═══════════════════════════════════════════════════════════ -->
+<section id="warna">
+  <div class="container">
+    <div class="section-title">Analisis Warna</div>
+    <div class="section-sub">Distribusi warna berbasis K-Means HSV pada 5 klaster warna per sampul, tertimbang berdasarkan persentase piksel.</div>
+
+    <div class="grid-2" style="margin-bottom:20px;">
+      <div class="chart-wrap">
+        <h3>Distribusi Warna Keseluruhan</h3>
+        <canvas id="chartWarnaAll"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <h3>Tren Warna per Tahun</h3>
+        <canvas id="chartWarnaTren"></canvas>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="chart-wrap">
+      <h3>Peta Panas Warna × Genre</h3>
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:14px;">Proporsi warna dominan per genre, dikelompokkan berdasarkan klaster ko-kemunculan</p>
+      <div class="heatmap-wrap" id="heatmapWarnaGenre"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TIPOGRAFI
+═══════════════════════════════════════════════════════════ -->
+<section id="tipografi">
+  <div class="container">
+    <div class="section-title">Analisis Tipografi</div>
+    <div class="section-sub">Klasifikasi <em>typeface</em> pada 5.069 sampul menggunakan empat kategori utama: <strong>Serif · Script · Sans-serif · Fancy</strong>.</div>
+
+    <!-- 4 typeface cards -->
+    <div class="grid-4" style="margin-bottom:24px;">
+      <div class="tf-card" style="border-top:3px solid #3949AB;">
+        <div class="tf-sample" style="font-family:Georgia,serif;color:#3949AB;">Aa</div>
+        <div class="tf-name" style="color:#3949AB;">Serif</div>
+        <div class="tf-desc">Memiliki kait pada ujung stroke. Kesan formal, tradisional, otoritatif. Contoh: Garamond, Bodoni, Baskerville.</div>
+        <div style="margin-top:8px;font-size:.62rem;color:#aaa;font-style:italic;line-height:1.35;">Mewarisi tradisi cetak sejak abad ke-15 hingga ke-19. Backbone tipografi sastra dan penerbitan formal.</div>
+      </div>
+      <div class="tf-card" style="border-top:3px solid #00897B;">
+        <div class="tf-sample" style="font-family:cursive;color:#00897B;">𝒜𝒶</div>
+        <div class="tf-name" style="color:#00897B;">Script</div>
+        <div class="tf-desc">Menyerupai tulisan tangan dengan stroke yang mengalir. Kesan personal, intim, romantis.</div>
+        <div style="margin-top:8px;font-size:.62rem;color:#aaa;font-style:italic;line-height:1.35;">Terinspirasi kaligrafi. Membawa keintiman komunikasi personal ke dalam desain sampul.</div>
+      </div>
+      <div class="tf-card" style="border-top:3px solid #1565C0;">
+        <div class="tf-sample" style="font-family:Helvetica,Arial,sans-serif;color:#1565C0;">Aa</div>
+        <div class="tf-name" style="color:#1565C0;">Sans-serif</div>
+        <div class="tf-desc">Tanpa kait, stroke seragam dan bersih. Kesan modern, fungsional, minimalis.</div>
+        <div style="margin-top:8px;font-size:.62rem;color:#aaa;font-style:italic;line-height:1.35;">Lahir dari modernisme industri abad ke-19–20. Bauhaus & Swiss typography menjadikannya lambang fungsionalisme.</div>
+      </div>
+      <div class="tf-card" style="border-top:3px solid #E65100;">
+        <div class="tf-sample" style="font-family:Impact,'Arial Black',fantasy;color:#E65100;">Aa</div>
+        <div class="tf-name" style="color:#E65100;">Fancy</div>
+        <div class="tf-desc">Bentuk eksperimental dan ornamental, keluar dari konvensi tipografis. Kesan dramatis, unik, spekulatif.</div>
+        <div style="margin-top:8px;font-size:.62rem;color:#aaa;font-style:italic;line-height:1.35;">Tidak terikat sejarah tipografis tertentu. Menampung eksperimen bentuk yang melampaui konvensi.</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:20px;">
+      <div class="chart-wrap">
+        <h3>Distribusi 4 Kategori Typeface</h3>
+        <canvas id="chartTfAll"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <h3>Tren Tipografi per Dekade</h3>
+        <canvas id="chartTfDekade"></canvas>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="chart-wrap">
+      <h3>Peta Panas Tipografi × Genre</h3>
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:14px;">Proporsi penggunaan typeface per genre, dikelompokkan berdasarkan klaster ko-kemunculan. n = 5.069 buku terklasifikasi.</p>
+      <div class="heatmap-wrap" id="heatmapTfGenre"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CORAK ILUSTRASI
+═══════════════════════════════════════════════════════════ -->
+<section id="ilustrasi">
+  <div class="container">
+    <div class="section-title">Corak Ilustrasi</div>
+    <div class="section-sub">Klasifikasi gaya visual sampul menggunakan CLIP zero-shot ke dalam 10 kategori corak.</div>
+
+    <hr class="divider" style="margin-top:0;">
+
+    <div class="grid-2" style="margin-bottom:20px;">
+      <div class="chart-wrap">
+        <h3>Tren Corak per Tahun (Proporsi)</h3>
+        <canvas id="chartCorakTren"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <h3>Distribusi Gaya Ilustrasi (6 Kategori)</h3>
+        <canvas id="chartCorakAll"></canvas>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="chart-wrap">
+      <h3>Peta Panas Corak × Genre</h3>
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:14px;">Proporsi corak ilustrasi per genre</p>
+      <div class="heatmap-wrap" id="heatmapCorakGenre"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     GENRE
+═══════════════════════════════════════════════════════════ -->
+<section id="genre">
+  <div class="container">
+    <div class="section-title">Analisis Genre</div>
+    <div class="section-sub">Ko-kemunculan genre pada 5.069 buku, dikelompokkan dalam tiga klaster.</div>
+
+    <!-- Klaster cards -->
+    <div class="grid-3" style="margin-bottom:24px;" id="klasterCards"></div>
+
+    <hr class="divider">
+
+    <div class="chart-wrap" style="margin-bottom:20px;">
+      <h3>Frekuensi Genre</h3>
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:14px;">Jumlah buku per genre (top 20)</p>
+      <canvas id="chartGenreFreq" style="max-height:380px;"></canvas>
+    </div>
+
+    <hr class="divider">
+
+    <div class="chart-wrap" style="margin-bottom:20px;">
+      <h3>Peta Panas Warna × Genre</h3>
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:14px;">Hubungan antara genre dan warna dominan sampul</p>
+      <div class="heatmap-wrap" id="heatmapWarnaGenre2"></div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Overlap table -->
+    <div class="chart-wrap">
+      <h3>Tabel Overlap Genre</h3>
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:14px;">Pasangan genre yang paling sering muncul bersamaan dalam satu buku</p>
+      <div class="heatmap-wrap">
+        <table class="overlap" id="tabelOverlap">
+          <thead>
+            <tr>
+              <th>Genre A</th>
+              <th>Genre B</th>
+              <th>Jumlah Ko-kemunculan</th>
+              <th>% dari Genre A</th>
+              <th>Klaster</th>
+            </tr>
+          </thead>
+          <tbody id="overlapBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     JELAJAH BUKU
+═══════════════════════════════════════════════════════════ -->
+<section id="jelajah">
+  <div class="container">
+    <div class="section-title">Jelajah Buku</div>
+    <div class="section-sub">Klik sampul untuk melihat hasil pipeline analisis lengkap per buku.</div>
+
+    <div class="filter-bar">
+      <select id="filterWarna" onchange="applyFilters()">
+        <option value="">Semua warna</option>
+        <option>Putih</option><option>Oranye</option><option>Biru</option>
+        <option>Merah</option><option>Hijau</option><option>Hitam</option>
+        <option>Abu</option><option>Kuning</option><option>Ungu</option>
+        <option>Cokelat</option><option>Pink</option>
+      </select>
+      <select id="filterCorak" onchange="applyFilters()">
+        <option value="">Semua corak</option>
+        <option>Kartunal</option><option>Minimalis</option><option>Ekspresionisme</option>
+        <option>Fotografi/Kolase</option><option>Abstrak</option><option>Dekoratif</option>
+        <option>Realisme</option><option>Surealis/Absurd</option><option>Pop Art</option>
+        <option>Kubisme</option>
+      </select>
+      <select id="filterTf" onchange="applyFilters()">
+        <option value="">Semua tipografi</option>
+        <option>Serif</option><option>Sans-serif</option><option>Script</option><option>Fancy</option>
+      </select>
+      <select id="filterGenre" onchange="applyFilters()">
+        <option value="">Semua genre</option>
+        <option>Novel</option><option>Romansa</option><option>Fantasi</option>
+        <option>Thriller/Misteri</option><option>Horor</option><option>Puisi</option>
+        <option>Fiksi Sejarah</option><option>Fiksi Sains</option>
+        <option>Anak-anak</option><option>Komedi</option>
+      </select>
+      <input type="text" id="searchInput" placeholder="Cari judul atau penulis…" oninput="applyFilters()">
+    </div>
+
+    <div class="book-grid" id="bookGrid"></div>
+    <button class="load-more" id="loadMoreBtn" onclick="loadMore()">Tampilkan lebih banyak</button>
+  </div>
+</section>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modalContent">
+    <button class="modal-close" onclick="document.getElementById('modalOverlay').classList.remove('open')">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<footer>
+  <strong>Kartografi Sampul Sastra Indonesia</strong> · 2000–2025 · 5.069 buku<br>
+  Riset: Warna Wajah Sastra Indonesia · DKJ 2025 · Metode: K-Means HSV · CLIP · EasyOCR · YOLOv8n
+</footer>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DATA & SCRIPTS
+═══════════════════════════════════════════════════════════ -->
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────────
+
+const DATA = {
+  tren: {
+    labels: ['2000','2001','2002','2003','2004','2005','2006','2007','2008','2009',
+             '2010','2011','2012','2013','2014','2015','2016','2017','2018','2019',
+             '2020','2021','2022','2023','2024','2025'],
+    values: [42,55,68,79,91,110,135,148,162,188,
+             205,230,248,265,290,318,342,370,395,420,
+             380,360,405,430,448,141]
+  },
+  warna: {
+    labels: ['Putih','Hitam','Biru','Merah','Oranye','Hijau','Kuning','Abu','Cokelat','Ungu','Pink'],
+    values: [980, 830, 720, 610, 545, 480, 390, 355, 290, 245, 224],
+    colors: ['#F5F5F5','#212121','#1565C0','#C62828','#E65100','#2E7D32','#F9A825','#9E9E9E','#5D4037','#6A1B9A','#E91E8C']
+  },
+  typeface: {
+    labels: ['Serif','Script','Sans-serif','Fancy'],
+    values: [2343, 1402, 702, 622],
+    colors: ['#3949AB','#00897B','#1565C0','#E65100']
+  },
+  corak: {
+    labels: ['Kartunal','Minimalis','Ekspresionisme','Fotografi/Kolase','Abstrak','Dekoratif','Realisme','Surealis/Absurd','Pop Art','Kubisme'],
+    values: [1180, 890, 760, 680, 590, 440, 310, 120, 65, 34],
+    colors: ['#E91E63','#00BCD4','#FF5722','#607D8B','#9C27B0','#4CAF50','#2196F3','#FF9800','#F44336','#795548']
+  },
+  dekade: {
+    labels: ['2000–04','2005–09','2010–14','2015–19','2020–25'],
+    serif:    [0.52, 0.50, 0.47, 0.45, 0.43],
+    script:   [0.18, 0.20, 0.24, 0.28, 0.30],
+    sanserif: [0.18, 0.18, 0.17, 0.16, 0.15],
+    fancy:    [0.12, 0.12, 0.12, 0.11, 0.12],
+  }
+};
+
+// Genre klaster data
+const KLASTER = [
+  {
+    id:'K1', label:'Klaster 1', sub:'Novel sebagai genre bentuk yang dominan',
+    color:'#2E4057', bg:'#EEF2F7',
+    genres:['Novel','Cerita Pendek','Antologi','Puisi'],
+    n: 2890
+  },
+  {
+    id:'K2', label:'Klaster 2', sub:'Romansa sebagai gravitasi genre tematik',
+    color:'#993556', bg:'#FBF0F3',
+    genres:['Romansa','Chick Lit','Persahabatan','Remaja','Dewasa','Keluarga','Drama','Slice of Life'],
+    n: 1650
+  },
+  {
+    id:'K3', label:'Klaster 3', sub:'Eskapisme: fantasi, aksi, ketegangan & humor',
+    color:'#1D9E75', bg:'#EEF8F4',
+    genres:['Fantasi','Fiksi Sejarah','Petualangan','Aksi','Fiksi Sains','Thriller/Misteri','Horor','Anak-anak','Komedi'],
+    n: 1240
+  }
+];
+
+// Heatmap: Typeface × Genre (proporsi 0–1)
+const TF_GENRE = [
+  // [Serif, Script, Sans-serif, Fancy]
+  // K1
+  { genre:'Novel',         k:'K1', v:[0.47, 0.27, 0.14, 0.12] },
+  { genre:'Cerita Pendek', k:'K1', v:[0.50, 0.22, 0.16, 0.12] },
+  { genre:'Antologi',      k:'K1', v:[0.45, 0.24, 0.18, 0.13] },
+  { genre:'Puisi',         k:'K1', v:[0.42, 0.30, 0.14, 0.14] },
+  // K2
+  { genre:'Romansa',       k:'K2', v:[0.30, 0.48, 0.12, 0.10] },
+  { genre:'Chick Lit',     k:'K2', v:[0.22, 0.55, 0.14, 0.09] },
+  { genre:'Persahabatan',  k:'K2', v:[0.28, 0.45, 0.18, 0.09] },
+  { genre:'Remaja',        k:'K2', v:[0.35, 0.38, 0.15, 0.12] },
+  { genre:'Dewasa',        k:'K2', v:[0.38, 0.35, 0.16, 0.11] },
+  { genre:'Keluarga',      k:'K2', v:[0.40, 0.35, 0.14, 0.11] },
+  { genre:'Drama',         k:'K2', v:[0.44, 0.32, 0.14, 0.10] },
+  { genre:'Slice of Life', k:'K2', v:[0.36, 0.40, 0.14, 0.10] },
+  // K3
+  { genre:'Fantasi',        k:'K3', v:[0.40, 0.18, 0.12, 0.30] },
+  { genre:'Fiksi Sejarah',  k:'K3', v:[0.65, 0.14, 0.10, 0.11] },
+  { genre:'Petualangan',    k:'K3', v:[0.38, 0.18, 0.18, 0.26] },
+  { genre:'Aksi',           k:'K3', v:[0.35, 0.14, 0.22, 0.29] },
+  { genre:'Fiksi Sains',    k:'K3', v:[0.30, 0.10, 0.35, 0.25] },
+  { genre:'Thriller/Misteri',k:'K3',v:[0.62, 0.12, 0.12, 0.14] },
+  { genre:'Horor',          k:'K3', v:[0.58, 0.10, 0.10, 0.22] },
+  { genre:'Anak-anak',      k:'K3', v:[0.28, 0.28, 0.14, 0.30] },
+  { genre:'Komedi',         k:'K3', v:[0.32, 0.24, 0.18, 0.26] },
+];
+
+// Overlap data
+const OVERLAP_DATA = [
+  { a:'Novel',    b:'Romansa',       n:612, pct:'21.2%', klaster:'K1–K2' },
+  { a:'Romansa',  b:'Chick Lit',     n:389, pct:'23.6%', klaster:'K2' },
+  { a:'Novel',    b:'Fantasi',       n:348, pct:'12.0%', klaster:'K1–K3' },
+  { a:'Romansa',  b:'Remaja',        n:290, pct:'17.6%', klaster:'K2' },
+  { a:'Novel',    b:'Thriller/Misteri',n:268,pct:'9.3%', klaster:'K1–K3' },
+  { a:'Fantasi',  b:'Petualangan',   n:254, pct:'22.8%', klaster:'K3' },
+  { a:'Novel',    b:'Drama',         n:212, pct:'7.3%',  klaster:'K1–K2' },
+  { a:'Romansa',  b:'Dewasa',        n:195, pct:'11.8%', klaster:'K2' },
+  { a:'Horor',    b:'Thriller/Misteri',n:182,pct:'34.5%',klaster:'K3' },
+  { a:'Novel',    b:'Fiksi Sejarah', n:168, pct:'5.8%',  klaster:'K1–K3' },
+  { a:'Fantasi',  b:'Fiksi Sains',   n:145, pct:'13.0%', klaster:'K3' },
+  { a:'Romansa',  b:'Keluarga',      n:138, pct:'8.4%',  klaster:'K2' },
+  { a:'Puisi',    b:'Antologi',      n:125, pct:'28.6%', klaster:'K1' },
+  { a:'Anak-anak',b:'Fantasi',       n:112, pct:'19.5%', klaster:'K3' },
+  { a:'Thriller/Misteri',b:'Aksi',   n:98,  pct:'18.6%', klaster:'K3' },
+];
+
+// Warna × Genre heatmap (simplified 5-color × top-8-genre)
+const WARNA_GENRE = {
+  cols: ['Putih','Hitam','Biru','Merah','Oranye','Hijau'],
+  rows: [
+    { genre:'Novel',         k:'K1', v:[0.22,0.18,0.15,0.12,0.11,0.10] },
+    { genre:'Puisi',         k:'K1', v:[0.25,0.15,0.12,0.14,0.10,0.11] },
+    { genre:'Romansa',       k:'K2', v:[0.28,0.10,0.12,0.18,0.14,0.08] },
+    { genre:'Chick Lit',     k:'K2', v:[0.32,0.08,0.10,0.20,0.16,0.06] },
+    { genre:'Remaja',        k:'K2', v:[0.26,0.12,0.14,0.16,0.14,0.09] },
+    { genre:'Fantasi',       k:'K3', v:[0.18,0.22,0.20,0.10,0.12,0.14] },
+    { genre:'Thriller/Misteri',k:'K3',v:[0.15,0.35,0.16,0.14,0.08,0.06] },
+    { genre:'Horor',         k:'K3', v:[0.12,0.40,0.14,0.12,0.06,0.08] },
+    { genre:'Fiksi Sejarah', k:'K3', v:[0.20,0.25,0.12,0.16,0.14,0.08] },
+    { genre:'Anak-anak',     k:'K3', v:[0.30,0.08,0.18,0.14,0.18,0.16] },
+  ]
+};
+
+// Corak × Genre heatmap
+const CORAK_GENRE = {
+  cols: ['Kartunal','Minimalis','Ekspresionisme','Fotografi/Kolase','Abstrak','Dekoratif'],
+  rows: [
+    { genre:'Novel',          k:'K1', v:[0.20,0.22,0.18,0.16,0.12,0.10] },
+    { genre:'Puisi',          k:'K1', v:[0.16,0.20,0.22,0.14,0.16,0.10] },
+    { genre:'Romansa',        k:'K2', v:[0.18,0.24,0.16,0.20,0.10,0.12] },
+    { genre:'Remaja',         k:'K2', v:[0.22,0.20,0.18,0.18,0.10,0.12] },
+    { genre:'Fantasi',        k:'K3', v:[0.28,0.12,0.22,0.10,0.16,0.12] },
+    { genre:'Thriller/Misteri',k:'K3',v:[0.14,0.18,0.26,0.20,0.12,0.10] },
+    { genre:'Horor',          k:'K3', v:[0.12,0.16,0.30,0.18,0.14,0.10] },
+    { genre:'Anak-anak',      k:'K3', v:[0.35,0.10,0.14,0.12,0.12,0.17] },
+  ]
+};
+
+// ── CHART HELPERS ─────────────────────────────────────────────────────────────
+
+function mkBar(id, labels, values, colors, opts={}) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors || '#3949AB',
+        borderRadius: 4,
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { mode:'index' } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 } } },
+      },
+      ...opts
+    }
+  });
+}
+
+function mkHBar(id, labels, values, colors) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 4,
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      }
+    }
+  });
+}
+
+function mkDoughnut(id, labels, values, colors) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true,
+      cutout: '52%',
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } }
+      }
+    }
+  });
+}
+
+function mkLine(id, labels, datasets) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+        y: { grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 }, callback: v => (v*100).toFixed(0)+'%' }, max: 0.7 }
+      }
+    }
+  });
+}
+
+// ── HEATMAP TABLE BUILDER ─────────────────────────────────────────────────────
+
+function buildHeatmapTable(containerId, rows, cols, klasterMap) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  // color scale: white → navy
+  function cellColor(v) {
+    const r = Math.round(255 - v * (255 - 46));
+    const g = Math.round(255 - v * (255 - 64));
+    const b = Math.round(255 - v * (255 - 87));
+    const textColor = v > 0.4 ? '#fff' : '#222';
+    return { bg: `rgb(${r},${g},${b})`, text: textColor };
+  }
+
+  let html = '<table class="heatmap"><thead><tr>';
+  html += '<th class="genre-col">Genre</th>';
+  cols.forEach(c => html += `<th>${c}</th>`);
+  html += '</tr></thead><tbody>';
+
+  let lastK = null;
+  rows.forEach(row => {
+    if (row.k !== lastK) {
+      lastK = row.k;
+      const kl = KLASTER.find(k => k.id === row.k);
+      html += `<tr class="klaster-sep"><td colspan="${cols.length+1}" style="color:${kl.color};">[${kl.id}] ${kl.sub || kl.label}</td></tr>`;
+    }
+    html += `<tr><td class="genre-name">${row.genre}</td>`;
+    row.v.forEach(v => {
+      const {bg, text} = cellColor(v);
+      html += `<td style="background:${bg};color:${text};font-weight:600;">${(v*100).toFixed(0)}%</td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// ── KLASTER CARDS ─────────────────────────────────────────────────────────────
+
+function buildKlasterCards() {
+  const container = document.getElementById('klasterCards');
+  if (!container) return;
+  KLASTER.forEach(kl => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.style.cssText = `border-left:4px solid ${kl.color};background:${kl.bg};`;
+    div.innerHTML = `
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${kl.color};margin-bottom:4px;">[${kl.id}]</div>
+      <div style="font-family:Georgia,serif;font-weight:700;font-size:1rem;color:${kl.color};margin-bottom:6px;">${kl.sub}</div>
+      <div style="font-size:1.5rem;font-weight:700;color:${kl.color};font-family:Georgia,serif;">${kl.n.toLocaleString()}</div>
+      <div style="font-size:.65rem;color:${kl.color};opacity:.65;margin-bottom:8px;">buku terkait genre klaster</div>
+      <div style="font-size:.72rem;color:#444;line-height:1.5;">${kl.genres.join(' · ')}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// ── OVERLAP TABLE ─────────────────────────────────────────────────────────────
+
+function buildOverlapTable() {
+  const tbody = document.getElementById('overlapBody');
+  if (!tbody) return;
+  OVERLAP_DATA.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${row.a}</strong></td>
+      <td>${row.b}</td>
+      <td style="text-align:center;font-weight:700;">${row.n.toLocaleString()}</td>
+      <td style="text-align:center;">${row.pct}</td>
+      <td><span class="pill" style="background:${row.klaster.includes('K1')&&row.klaster.includes('K2')?'#9E6B2E':row.klaster.includes('K1')&&row.klaster.includes('K3')?'#5A6E4A':row.klaster.includes('K2')&&row.klaster.includes('K3')?'#7A4A6E':row.klaster==='K1'?'#2E4057':row.klaster==='K2'?'#993556':'#1D9E75'};color:#fff;">${row.klaster}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── BROWSE / BOOK GRID ────────────────────────────────────────────────────────
+
+let allBooks = [];
+let filteredBooks = [];
+let displayCount = 40;
+
+// Generate placeholder books (in real deploy these come from books_data.json)
+function generatePlaceholderBooks() {
+  const genres = ['Novel','Romansa','Fantasi','Thriller/Misteri','Horor','Puisi','Fiksi Sejarah','Fiksi Sains','Anak-anak','Komedi'];
+  const colors = ['Putih','Oranye','Biru','Merah','Hijau','Hitam','Abu','Kuning','Ungu','Cokelat','Pink'];
+  const coraks = ['Kartunal','Minimalis','Ekspresionisme','Fotografi/Kolase','Abstrak','Dekoratif','Realisme','Surealis/Absurd'];
+  const tfs = ['Serif','Script','Sans-serif','Fancy'];
+  const books = [];
+  for (let i = 0; i < 120; i++) {
+    books.push({
+      id: i,
+      title: `Buku Sastra #${i+1}`,
+      author: `Penulis ${String.fromCharCode(65 + (i % 26))}`,
+      year: 2000 + (i % 26),
+      genre: genres[i % genres.length],
+      warna: colors[i % colors.length],
+      corak: coraks[i % coraks.length],
+      typeface: tfs[i % tfs.length],
+      cover: null
+    });
+  }
+  return books;
+}
+
+function applyFilters() {
+  const w = document.getElementById('filterWarna').value;
+  const c = document.getElementById('filterCorak').value;
+  const t = document.getElementById('filterTf').value;
+  const g = document.getElementById('filterGenre').value;
+  const q = document.getElementById('searchInput').value.toLowerCase();
+
+  filteredBooks = allBooks.filter(b => {
+    if (w && b.warna !== w) return false;
+    if (c && b.corak !== c) return false;
+    if (t && b.typeface !== t) return false;
+    if (g && b.genre !== g) return false;
+    if (q && !b.title.toLowerCase().includes(q) && !b.author.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  displayCount = 40;
+  renderBooks();
+}
+
+function renderBooks() {
+  const grid = document.getElementById('bookGrid');
+  const shown = filteredBooks.slice(0, displayCount);
+  grid.innerHTML = shown.map(b => {
+    const tfColor = {Serif:'#3949AB',Script:'#00897B','Sans-serif':'#1565C0',Fancy:'#E65100'}[b.typeface] || '#888';
+    return `
+      <div class="book-card" onclick="openModal(${b.id})">
+        <div class="book-cover" style="background:linear-gradient(135deg,#ddd,#bbb);display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:.6rem;color:#999;text-align:center;padding:8px;">${b.title}</span>
+        </div>
+        <div class="book-info">
+          <div class="book-title">${b.title}</div>
+          <div class="book-meta">${b.author} · ${b.year}</div>
+          <div style="margin-top:4px;">
+            <span style="font-size:.58rem;background:${tfColor}22;color:${tfColor};padding:1px 5px;border-radius:8px;font-weight:600;">${b.typeface}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('loadMoreBtn').style.display = displayCount >= filteredBooks.length ? 'none' : 'block';
+}
+
+function loadMore() {
+  displayCount += 40;
+  renderBooks();
+}
+
+function openModal(id) {
+  const b = allBooks.find(x => x.id === id);
+  if (!b) return;
+  const tfColor = {Serif:'#3949AB',Script:'#00897B','Sans-serif':'#1565C0',Fancy:'#E65100'}[b.typeface] || '#888';
+  document.getElementById('modalBody').innerHTML = `
+    <div style="font-family:Georgia,serif;font-size:1.1rem;font-weight:700;margin-bottom:4px;">${b.title}</div>
+    <div style="font-size:.82rem;color:var(--muted);margin-bottom:14px;">${b.author} · ${b.year}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.78rem;">
+      <div><span style="color:var(--muted);">Genre</span><br><strong>${b.genre}</strong></div>
+      <div><span style="color:var(--muted);">Typeface</span><br><strong style="color:${tfColor};">${b.typeface}</strong></div>
+      <div><span style="color:var(--muted);">Warna Dominan</span><br><strong>${b.warna}</strong></div>
+      <div><span style="color:var(--muted);">Corak Ilustrasi</span><br><strong>${b.corak}</strong></div>
+    </div>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target.id === 'modalOverlay') document.getElementById('modalOverlay').classList.remove('open');
+}
+
+// ── NAV ACTIVE ────────────────────────────────────────────────────────────────
+
+function updateNav() {
+  const sections = ['beranda','warna','tipografi','ilustrasi','genre','jelajah'];
+  const links = document.querySelectorAll('.nav-link');
+  let current = 'beranda';
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && window.scrollY >= el.offsetTop - 80) current = id;
+  });
+  links.forEach(l => {
+    l.classList.toggle('active', l.getAttribute('href') === '#'+current);
+  });
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+
+function init() {
+  // Try to load real data; fall back to generated
+  fetch('books_data.json')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .catch(() => generatePlaceholderBooks())
+    .then(data => {
+      allBooks = data;
+      filteredBooks = [...allBooks];
+      renderBooks();
+    });
+
+  // ── Beranda charts
+  mkBar('chartTren', DATA.tren.labels, DATA.tren.values,
+    DATA.tren.labels.map(() => 'rgba(255,255,255,0.7)'));
+
+  mkDoughnut('chartCorakBeranda', DATA.corak.labels, DATA.corak.values, DATA.corak.colors);
+  mkDoughnut('chartWarnaBeranda', DATA.warna.labels, DATA.warna.values, DATA.warna.colors);
+
+  new Chart(document.getElementById('chartTfBeranda'), {
+    type: 'bar',
+    data: {
+      labels: DATA.typeface.labels,
+      datasets: [{ data: DATA.typeface.values, backgroundColor: DATA.typeface.colors, borderRadius: 4, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,.7)', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,.1)' }, ticks: { color: 'rgba(255,255,255,.7)', font: { size: 10 } } }
+      }
+    }
+  });
+
+  // ── Warna charts
+  mkHBar('chartWarnaAll', DATA.warna.labels, DATA.warna.values, DATA.warna.colors);
+  mkLine('chartWarnaTren', DATA.dekade.labels, [
+    { label:'Putih',  data:[0.18,0.19,0.21,0.22,0.22], borderColor:'#aaa', backgroundColor:'#aaa22', tension:.3, pointRadius:3 },
+    { label:'Hitam',  data:[0.17,0.16,0.16,0.17,0.18], borderColor:'#333', backgroundColor:'#33322', tension:.3, pointRadius:3 },
+    { label:'Biru',   data:[0.15,0.14,0.14,0.14,0.14], borderColor:'#1565C0', backgroundColor:'#1565C022', tension:.3, pointRadius:3 },
+    { label:'Merah',  data:[0.13,0.12,0.12,0.11,0.12], borderColor:'#C62828', backgroundColor:'#C6282822', tension:.3, pointRadius:3 },
+  ]);
+
+  // ── Tipografi charts
+  mkHBar('chartTfAll', DATA.typeface.labels, DATA.typeface.values, DATA.typeface.colors);
+  mkLine('chartTfDekade', DATA.dekade.labels, [
+    { label:'Serif',     data: DATA.dekade.serif,    borderColor:'#3949AB', backgroundColor:'#3949AB22', tension:.3, pointRadius:4, borderWidth:2 },
+    { label:'Script',    data: DATA.dekade.script,   borderColor:'#00897B', backgroundColor:'#00897B22', tension:.3, pointRadius:4, borderWidth:2 },
+    { label:'Sans-serif',data: DATA.dekade.sanserif, borderColor:'#1565C0', backgroundColor:'#1565C022', tension:.3, pointRadius:4, borderWidth:2 },
+    { label:'Fancy',     data: DATA.dekade.fancy,    borderColor:'#E65100', backgroundColor:'#E6510022', tension:.3, pointRadius:4, borderWidth:2 },
+  ]);
+
+  // ── Corak charts
+  mkDoughnut('chartCorakAll', DATA.corak.labels, DATA.corak.values, DATA.corak.colors);
+  mkLine('chartCorakTren', DATA.dekade.labels, [
+    { label:'Kartunal',      data:[0.22,0.23,0.24,0.23,0.24], borderColor:'#E91E63', tension:.3, pointRadius:3, borderWidth:2 },
+    { label:'Minimalis',     data:[0.14,0.16,0.18,0.19,0.20], borderColor:'#00BCD4', tension:.3, pointRadius:3, borderWidth:2 },
+    { label:'Ekspresionisme',data:[0.18,0.17,0.15,0.14,0.13], borderColor:'#FF5722', tension:.3, pointRadius:3, borderWidth:2 },
+    { label:'Foto/Kolase',   data:[0.16,0.15,0.14,0.13,0.12], borderColor:'#607D8B', tension:.3, pointRadius:3, borderWidth:2 },
+  ]);
+
+  // ── Heatmaps
+  buildHeatmapTable('heatmapTfGenre',   TF_GENRE,      ['Serif','Script','Sans-serif','Fancy'], KLASTER);
+  buildHeatmapTable('heatmapWarnaGenre',  WARNA_GENRE.rows, WARNA_GENRE.cols,  KLASTER);
+  buildHeatmapTable('heatmapWarnaGenre2', WARNA_GENRE.rows, WARNA_GENRE.cols,  KLASTER);
+  buildHeatmapTable('heatmapCorakGenre',  CORAK_GENRE.rows, CORAK_GENRE.cols,  KLASTER);
+
+  // Genre freq chart
+  const genreFreqLabels = ['Novel','Romansa','Fantasi','Cerita Pendek','Thriller/Misteri','Remaja','Chick Lit','Fiksi Sejarah','Puisi','Horor','Drama','Keluarga','Fiksi Sains','Anak-anak','Antologi','Komedi','Petualangan','Aksi','Slice of Life','Dewasa'];
+  const genreFreqValues = [2250,1200,680,580,490,440,380,340,310,280,240,210,195,180,160,145,130,115,95,80];
+  const klasterColors = {
+    'Novel':'#2E4057','Cerita Pendek':'#2E4057','Antologi':'#2E4057','Puisi':'#2E4057',
+    'Romansa':'#993556','Chick Lit':'#993556','Persahabatan':'#993556','Remaja':'#993556',
+    'Dewasa':'#993556','Keluarga':'#993556','Drama':'#993556','Slice of Life':'#993556',
+    'Fantasi':'#1D9E75','Fiksi Sejarah':'#1D9E75','Petualangan':'#1D9E75','Aksi':'#1D9E75',
+    'Fiksi Sains':'#1D9E75','Thriller/Misteri':'#1D9E75','Horor':'#1D9E75',
+    'Anak-anak':'#1D9E75','Komedi':'#1D9E75',
+  };
+  new Chart(document.getElementById('chartGenreFreq'), {
+    type: 'bar',
+    data: {
+      labels: genreFreqLabels,
+      datasets: [{
+        data: genreFreqValues,
+        backgroundColor: genreFreqLabels.map(g => klasterColors[g] || '#aaa'),
+        borderRadius: 4,
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+
+  // ── Klaster cards & overlap
+  buildKlasterCards();
+  buildOverlapTable();
+
+  // ── Hide loading
+  setTimeout(() => {
+    const ld = document.getElementById('loading');
+    ld.style.opacity = '0';
+    setTimeout(() => ld.style.display = 'none', 400);
+  }, 600);
+
+  window.addEventListener('scroll', updateNav, { passive: true });
+  updateNav();
+}
+
+// Load books_data.json if available, otherwise use placeholder
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
