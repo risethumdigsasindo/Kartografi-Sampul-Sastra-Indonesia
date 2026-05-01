@@ -340,7 +340,7 @@ main { min-height: calc(100vh - 52px); }
         <div class="sub">Serif · Script · Sans-serif · Fancy</div>
       </div>
       <div class="stat-card" style="color:#E53935">
-        <div class="lbl">Corak Ilustrasi</div>
+        <div class="lbl">Gaya Ilustrasi</div>
         <div class="val">5.068</div>
         <div class="sub">10 kategori CLIP</div>
       </div>
@@ -357,7 +357,7 @@ main { min-height: calc(100vh - 52px); }
         <div class="chart-wrap" style="height:220px"><canvas id="chart-trend-year"></canvas></div>
       </div>
       <div class="chart-card">
-        <h3>Distribusi Corak Ilustrasi</h3>
+        <h3>Distribusi Gaya Ilustrasi</h3>
         <div class="chart-wrap" style="height:220px"><canvas id="chart-corak-dist"></canvas></div>
       </div>
     </div>
@@ -1225,7 +1225,7 @@ function buildPipelineHTML(b) {
   let corakBars = '';
   if (corakScoreKeys.length) {
     corakBars = `<div class="modal-section">
-      <div class="modal-section-title">Skor CLIP per Corak Ilustrasi</div>
+      <div class="modal-section-title">Skor CLIP per Gaya Ilustrasi</div>
       ${corakScoreKeys.map(([k,v]) => `
         <div class="score-row">
           <div class="score-label">${CORAK_ID[k]||k}</div>
