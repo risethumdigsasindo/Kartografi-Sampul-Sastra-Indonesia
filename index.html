@@ -1312,7 +1312,6 @@ function buildPipelineHTML(b) {
   // Step 6: K-Means warna
   const step6 = `<div class="pipe-step">
     <div class="pipe-label">K-Means Warna</div>
-    <div class="pipe-value">${b.warna||b.warna_calc||'–'}</div>
     <div class="pipe-sub" style="display:flex;gap:3px;margin-top:4px">
       ${[{h:b.h1,p:b.p1},{h:b.h2,p:b.p2},{h:b.h3,p:b.p3}].filter(x=>x.h&&x.h!=='nan').map(x=>`<div style="width:14px;height:14px;border-radius:3px;background:${x.h&&x.h.startsWith('#')?x.h:'#'+(x.h||'ccc')}" title="${x.p}%"></div>`).join('')}
     </div>
